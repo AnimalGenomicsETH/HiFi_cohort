@@ -1,8 +1,9 @@
 rule fibertools_predict_m6a:
     input:
-        '' #raw PacBio ubam with kinetics
+        'alignments/uBAM/{sample}/{cell}.5mC.bam'
+        #raw PacBio ubam with kinetics
     output:
-        '' #new ubam with methylation but without kinetics 
+        'alignments/uBAM/{sample}/{cell}.m6a.bam' #new ubam with methylation but without kinetics
     conda:
         'fiber'
     threads: 16
@@ -45,8 +46,18 @@ rule pb_CpG_tools:
         walltime = '4h'
     params:
         prefix = lambda wildcards, output: PurePath(output['bed']).with_suffix('').with_suffix(''),
-	model = "/cluster/work/pausch/audald/software/pb-CpG-tools-v2.3.1-x86_64-unknown-linux-gnu/models/pileup_calling_model.v1.tflite"
+        model = "/cluster/work/pausch/audald/software/pb-CpG-tools-v2.3.1-x86_64-unknown-linux-gnu/models/pileup_calling_model.v1.tflite"
     shell:
         '''
-	aligned_bam_to_cpg_score --bam {input.cram} --ref {input.reference} --model {params.model} --output-prefix {params.prefix} --threads {threads}
+        aligned_bam_to_cpg_score --bam {input.cram} --ref {input.reference} --model {params.model} --output-prefix {params.prefix} --threads {threads}
+        '''
+
+rule batMeth:
+    input:
+        expand(rules.pb_CpG_tools.output['bed'],sample=samples)
+    output:
+        'methylation/merged.bed'
+    shell:
+        '''
+        methBat
         '''
