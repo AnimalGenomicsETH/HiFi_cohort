@@ -32,7 +32,7 @@ rule minimap2_align:
         samtools sort - -m 3000M -@ {threads} -T $TMPDIR -o {output[0]} --write-index
         '''
 
-def gather_cells(HiFi_dataframe,sample):
+def gather_cells(sample):
     zipper = {'cell':[],'methylation':[]}
     for _,row in HiFi_dataframe[HiFi_dataframe['ID']==sample].iterrows():
         zipper['cell'].append(row["Metadata Context ID"])
