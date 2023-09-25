@@ -1,18 +1,3 @@
-rule fibertools_predict_m6a:
-    input:
-        'alignments/uBAM/{sample}/{cell}.5mC.bam' #raw PacBio ubam with kinetics
-    output:
-        'alignments/uBAM/{sample}/{cell}.m6a.bam' #new ubam with methylation but without kinetics
-    conda:
-        'fiber'
-    threads: 16
-    resources:
-        mem_mb = 1500,
-        walltime = '24h'
-    shell:
-        '''
-        ft m6a -t {threads} {input} {output}
-        '''
 
 rule minimap2_align:
     input:
@@ -34,9 +19,9 @@ rule minimap2_align:
 
 def gather_cells(sample):
     zipper = {'cell':[],'methylation':[]}
-    for _,row in HiFi_dataframe[HiFi_dataframe['ID']==sample].iterrows():
-        zipper['cell'].append(row["Metadata Context ID"])
-        zipper['methylation'].append({"5mC" if row["Kinetic Data"} == "No" else "m6a"})
+    for _,row in HiFi_dataframe[HiFi_dataframe['Sample']==sample].iterrows():
+        zipper['cell'].append(row["Cell"])
+        zipper['methylation'].append("5mC" if row["Kinetics"] == "No" else "m6a")
     return zipper
 
 rule samtools_merge:

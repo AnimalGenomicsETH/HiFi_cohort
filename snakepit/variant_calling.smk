@@ -3,7 +3,7 @@
 
 rule deepvariant:
     input:
-        expand(rules.samtools_merge.output,samples=samples)
+        expand(rules.samtools_merge.output,sample=samples)
     output:
         '{read_type}_DV/cohort.Unrevised.vcf.gz'
     shell:
@@ -13,7 +13,7 @@ rule deepvariant:
 
 rule beagle4_impute:
     input:
-        rule.deepvariant.output
+        rules.deepvariant.output
     output:
         '{read_type}_DV/cohort.beagle4.vcf.gz'
     shell:
@@ -47,8 +47,8 @@ rule hiphase:
         vcf_snv = 'vcf.gz',
         reference = config['reference']
     output:
-        cram = phased + "{sample}/{sample}.mm2.haplotagged.cram",
-        vcf_snv = phased + "{sample}/{sample}.mm2.DV.phased.vcf.gz",
+        cram = "{sample}/{sample}.mm2.haplotagged.cram",
+        vcf_snv = "{sample}/{sample}.mm2.DV.phased.vcf.gz",
         summary = multiext("{sample}/{sample}.mm2.phased",".summary.tsv","stats.tvt","blocks.tsv")
     threads: 16
     resources:

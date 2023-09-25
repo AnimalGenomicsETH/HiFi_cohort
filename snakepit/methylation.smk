@@ -18,10 +18,10 @@ rule fibertools_predict_m6a:
 rule pb_CpG_tools:
     input:
         cram = rules.hiphase.output['cram'],
-        reference = ref
+        reference = config['reference']
     output:
-        bed = phased + "{sample}/{sample}.pbmm2.combined.bed",
-        BigWig = phased + "{sample}/{sample}.pbmm2.combined.bw"
+        bed = "{sample}/{sample}.pbmm2.combined.bed",
+        BigWig = "{sample}/{sample}.pbmm2.combined.bw"
     threads: 12
     resources:
         mem_mb = 1500,
