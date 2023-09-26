@@ -13,7 +13,7 @@ rule minimap2_align:
     shell:
         '''
         samtools fastq -T rq,MM,ML --threads {threads} {input.uBAM} |\
-        minimap2 -t {threads} -a map-hifi -R '@RG\\tPL:PacBio\\tID:{wildcards.cell}\\tSM:{wildcards.sample}' -y -Y {input.reference} - |\
+        minimap2 -t {threads} -ax map-hifi -R '@RG\\tPL:PacBio\\tID:{wildcards.cell}\\tSM:{wildcards.sample}' -y -Y {input.reference} - |\
         samtools sort - -m 3000M -@ {threads} -T $TMPDIR -o {output[0]} --write-index
         '''
 

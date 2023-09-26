@@ -4,8 +4,6 @@ rule fibertools_predict_m6a:
         #raw PacBio ubam with kinetics
     output:
         'alignments/uBAM/{sample}/{cell}.m6a.bam' #new ubam with methylation but without kinetics
-    conda:
-        'fiber'
     threads: 16
     resources:
         mem_mb = 1500,
