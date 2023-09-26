@@ -1,14 +1,20 @@
 
 
-
 rule deepvariant:
     input:
-        expand(rules.samtools_merge.output,sample=samples)
+        expand(rules.samtools_merge.output,sample=samples),
+        config = 'config/DV.yaml'
     output:
-        '{read_type}_DV/cohort.Unrevised.vcf.gz'
+        '{read_type}_DV/all.Unrevised.vcf.gz'
+    params:
+        name = lambda wildcards, output: PurePath(output[0]).parent,
+        model = lambda wildcards: 'WGS' if wildcards.read_type == 'SR' else 'PACBIO'
+    localrule: True
     shell:
         '''
-        do
+        snakemake -s /cluster/work/pausch/alex/BSW_analysis/snakepit/deepvariant.smk --configfile {input.config} \
+        --config Run_name="{params.name}" bam_path="alignments/" bam_index=".csi" bam_name="{{sample}}.bam" model="{params.model}" \
+        --profile "slurm/fullNT" --nolock
         '''
 
 rule beagle4_impute:

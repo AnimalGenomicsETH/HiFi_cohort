@@ -14,6 +14,7 @@ workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).pare
 rule all:
     input:
         expand(rules.samtools_merge.output,sample=samples),
-        'variants/cohort.merged.vcf.gz',
-        'happy/F1.csv',
-        'methylation/merged.bed'
+        'HiFi_DV/all.Unrevised.vcf.gz'
+        #'variants/cohort.merged.vcf.gz',
+        #'happy/F1.csv',
+        #'methylation/merged.bed'
