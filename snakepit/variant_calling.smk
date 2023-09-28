@@ -19,7 +19,8 @@ rule deepvariant:
 
 rule beagle4_impute:
     input:
-        rules.deepvariant.output
+        '{read_type}_DV/{region}.Unrevised.vcf.gz'
+        #rules.deepvariant.output
     output:
         multiext('{read_type}_DV/{region}.beagle4.vcf.gz','','.tbi')
     params:
@@ -28,11 +29,11 @@ rule beagle4_impute:
     threads: 10
     resources:
         mem_mb = 4000,
-        walltime = '24h'
+        walltime = '4h'
     shell:
         '''
         java -jar -Xss25m -Xmx40G /cluster/work/pausch/alex/software/beagle.27Jan18.7e1.jar gl={input} nthreads={threads} out={params.prefix}
-        mv {output[0]} $TMPDIR/{params.name}
+        cp {output[0]} $TMPDIR/{params.name}
         bcftools reheader -f {config[reference]}.fai -o {output[0]} $TMPDIR/{params.name}
         tabix -fp vcf {output[0]}
         '''

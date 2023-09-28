@@ -11,10 +11,12 @@ include: 'snakepit/methylation.smk'
 
 workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
 
+wildcard_constraints:
+    sample = r'\w+'
+
 rule all:
     input:
-        expand(rules.samtools_merge.output,sample=samples),
-        'HiFi_DV/all.Unrevised.vcf.gz'
+        expand(rules.samtools_merge.output,sample=samples,mapper=['mm2','pbmm2'])
         #'variants/cohort.merged.vcf.gz',
         #'happy/F1.csv',
         #'methylation/merged.bed'

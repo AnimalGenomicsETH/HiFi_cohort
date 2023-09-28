@@ -22,17 +22,19 @@ rule pbmm2_align:
         uBAM = lambda wildcards: rules.fibertools_predict_m6a.output[0] if wildcards.methylation == 'm6a' else 'alignments/uBAM/{sample}/{cell}.5mC.bam',
         reference = Path(config['reference']).with_suffix('.CCS.mmi')
     output:
-        temp(multiext('alignments/pbmm2/{sample}/{cell}.{methylation}.bam','','.csi'))
+        temp(multiext('alignments/pbmm2/{sample}/{cell}.{methylation}.bam','','.bai'))
+    params:
+        index = lambda wildcards, output: PurePath(output[1]).suffix.upper()[1:]
     threads: lambda wildcards, input: 24 if input.size_mb > 20e3 else 12
     resources:
-        mem_mb = 3000,
-        walltime = '4h',
+        mem_mb = 4000,
+        walltime = '24h',
         scratch = '50G'
     conda:
         'pbccs'
     shell:
         '''
-        pbmm2 align {input.reference} {input.uBAM} {output[0]} --preset CCS --sort -j {threads} --sample {wildcards.sample} --sort-memory 3000M --bam-index BAI
+        pbmm2 align {input.reference} {input.uBAM} {output[0]} --preset CCS --sort -j {threads} --sample {wildcards.sample} --sort-memory 3000M --bam-index {params.index}
         '''
 
 def gather_cells(sample):
