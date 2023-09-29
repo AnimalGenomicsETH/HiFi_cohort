@@ -2,7 +2,7 @@
 regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
 rule deepvariant:
     input:
-        expand(rules.samtools_merge.output,sample=samples,mapper='mm2'),
+        lambda wildcards: expand(rules.samtools_merge.output,sample=samples,mapper='mm2' if wildcards.read_type=='HiFi' else 'pbmm2'),
         config = 'config/DV.yaml'
     output:
         expand('{read_type}_DV/{region}.Unrevised.vcf.gz',region=regions,allow_missing=True)
@@ -57,7 +57,7 @@ rule pbsv_discover:
         'pbccs'
     threads: 1
     resources:
-        mem_mb = 2500
+        mem_mb = 15000
     shell:
         '''
         pbsv discover --ccs {input[0]} {output}
@@ -70,32 +70,44 @@ rule pbsv_call:
         'SVs/cohort.pbsv.vcf'
     conda:
         'pbccs'
-    threads: 8
+    threads: 4
     resources:
-        mem_mb = 4000
+        mem_mb = 40000,
+        walltime = '4h'
     shell:
         '''
-        pbsv call --hifi -j {threads} --max-ins-length 20k {config[reference]} {input.signatures} {output}
+        pbsv call --hifi -j {threads} --log-level INFO --max-ins-length 20k {config[reference]} {input.signatures} {output}
         '''
 
 rule sniffles_call:
     input:
-        rules.samtools_merge.output
+        bam = expand(rules.samtools_merge.output,mapper='pbmm2',allow_missing=True)
     output:
-        vcf = 'SVs/{sample}.vcf.gz',
-	snf = 'SVs/{sample}.snf'
+        vcf = 'SVs/{sample}.sniffles.vcf.gz',
+	    snf = 'SVs/{sample}.sniffles.snf'
+    threads: 4
+    resources:
+        mem_mb = 2500
+    conda:
+        'sniffles'
     shell:
         '''
+        sniffles --input {input.bam[0]} --reference {config[reference]} --sample-id {wildcards.sample} --threads {threads} --vcf {output.vcf} --snf {output.snf}
         '''
 
 rule sniffles_merge:
     input:
         expand(rules.sniffles_call.output['snf'],sample=samples)
     output:
-        'SVs/cohort.SVs.vcf.gz'
+        'SVs/cohort.sniffles.vcf.gz'
+    threads: 16
+    resources:
+        mem_mb = 6000
+    conda:
+        'sniffles'
     shell:
         '''
-        sniffles merge ...
+        sniffles --input {input.snfs} --reference {config[reference]} --threads {threads} --vcf {output.vcf}
         '''
 
 rule hiphase:
