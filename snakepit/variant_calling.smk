@@ -97,9 +97,9 @@ rule sniffles_call:
 
 rule sniffles_merge:
     input:
-        expand(rules.sniffles_call.output['snf'],sample=samples)
+        snfs = expand(rules.sniffles_call.output['snf'],sample=samples)
     output:
-        'SVs/cohort.sniffles.vcf.gz'
+        vcf = 'SVs/cohort.sniffles.vcf.gz'
     threads: 16
     resources:
         mem_mb = 6000
