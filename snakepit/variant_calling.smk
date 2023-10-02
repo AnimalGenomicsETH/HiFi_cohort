@@ -2,19 +2,19 @@
 regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
 rule deepvariant:
     input:
-        lambda wildcards: expand(rules.samtools_merge.output,sample=samples,mapper='mm2' if wildcards.read_type=='HiFi' else 'pbmm2'),
+        lambda wildcards: expand(rules.samtools_merge.output,sample=samples,mapper='mm2' if wildcards.mapper=='HiFi' else 'pbmm2'),
         config = 'config/DV.yaml'
     output:
-        expand('{read_type}_DV/{region}.Unrevised.vcf.gz',region=regions,allow_missing=True)
+        expand('{mapper}_DV/{region}.Unrevised.vcf.gz',region=regions,allow_missing=True)
     params:
         name = lambda wildcards, output: PurePath(output[0]).parent,
-        model = lambda wildcards: 'WGS' if wildcards.read_type == 'SR' else 'PACBIO'
+        model = lambda wildcards: 'WGS' if wildcards.mapper == 'SR' else 'PACBIO'
     localrule: True
     shell:
         '''
         snakemake -s /cluster/work/pausch/alex/BSW_analysis/snakepit/deepvariant.smk --configfile {input.config} \
-        --config Run_name="{params.name}" model="{params.model}" \
-        --profile "slurm/fullNT" --nolock
+        --config Run_name="{params.name}" model="{params.model}" bam_name="{{sample}}.{wildcards.mapper}.bam" \
+        --profile "slurm/fullNT" --resources storage_load=500 --nolock
         '''
 
 rule beagle4_impute:
@@ -81,33 +81,49 @@ rule pbsv_call:
 
 rule sniffles_call:
     input:
-        bam = expand(rules.samtools_merge.output,mapper='pbmm2',allow_missing=True)
+        bam = expand(rules.samtools_merge.output,mapper='pbmm2',allow_missing=True),
+        TR = 'GCA_002263795.4_ARS-UCD1.3_genomic.trf.bed'
     output:
         vcf = 'SVs/{sample}.sniffles.vcf.gz',
 	    snf = 'SVs/{sample}.sniffles.snf'
     threads: 4
     resources:
-        mem_mb = 2500
+        mem_mb = 2000
     conda:
         'sniffles'
     shell:
         '''
-        sniffles --input {input.bam[0]} --reference {config[reference]} --sample-id {wildcards.sample} --threads {threads} --vcf {output.vcf} --snf {output.snf}
+        sniffles --input {input.bam[0]} --reference {config[reference]} --tandem-repeats {input.TR} --sample-id {wildcards.sample} --threads {threads} --max-del-seq-len 100000 --vcf {output.vcf} --snf {output.snf}
         '''
 
 rule sniffles_merge:
     input:
-        snfs = expand(rules.sniffles_call.output['snf'],sample=samples)
+        snfs = expand(rules.sniffles_call.output['snf'],sample=samples),
+        TR = 'GCA_002263795.4_ARS-UCD1.3_genomic.trf.bed'
     output:
         vcf = 'SVs/cohort.sniffles.vcf.gz'
-    threads: 16
+    threads: 12
     resources:
-        mem_mb = 6000
+        mem_mb = 3000
     conda:
         'sniffles'
     shell:
         '''
-        sniffles --input {input.snfs} --reference {config[reference]} --threads {threads} --vcf {output.vcf}
+        sniffles --input {input.snfs} --reference {config[reference]} --tandem-repeats {input.TR} --combine-pair-relabel --threads {threads} --max-del-seq-len 100000 --vcf {output.vcf}
+        '''
+
+rule bcftools_filter:
+    input:
+        rules.sniffles_merge.output
+    output:
+        multiext('SVs/InDels.sniffles.vcf.gz','','.tbi')
+    threads: 2
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        bcftools view --threads {threads} -i 'INFO/SVTYPE=="INS,DEL"' -o {output[0]} {input}
+        tabix -p vcf {output[0]}
         '''
 
 rule hiphase:
