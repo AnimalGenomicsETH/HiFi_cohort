@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import PurePath
 
 HiFi_dataframe = pd.read_csv(config['sample_sheet'])
-samples = list(HiFi_dataframe['Sample'].unique())
+samples = sorted(list(HiFi_dataframe['Sample'].unique()))
 
 include: 'snakepit/alignment.smk'
 include: 'snakepit/variant_calling.smk'

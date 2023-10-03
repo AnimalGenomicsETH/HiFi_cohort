@@ -122,7 +122,8 @@ rule bcftools_filter:
         mem_mb = 2500
     shell:
         '''
-        bcftools view --threads {threads} -i 'INFO/SVTYPE=="INS,DEL"' -o {output[0]} {input}
+        bcftools +fill-from-fasta {input} -- -c REF -f {config[reference]} |\
+        bcftools view --threads {threads} -i 'INFO/SVLEN<100000&&INFO/SVTYPE!="BND"' -o {output[0]}
         tabix -p vcf {output[0]}
         '''
 
