@@ -9,13 +9,14 @@ include: 'snakepit/alignment.smk'
 include: 'snakepit/variant_calling.smk'
 include: 'snakepit/methylation.smk'
 
-workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
+#workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
 
 wildcard_constraints:
     sample = r'\w+'
 
 rule all:
     input:
+        expand(rules.short_read_align.output,sample=samples,mapper=['bwa','strobe']),
         expand(rules.samtools_merge.output,sample=samples,mapper=['mm2','pbmm2'])
         #'variants/cohort.merged.vcf.gz',
         #'happy/F1.csv',

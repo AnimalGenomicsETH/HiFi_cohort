@@ -44,16 +44,67 @@ def gather_cells(sample):
         zipper['methylation'].append("5mC" if row["Kinetics"] == "No" else "m6a")
     return zipper
 
+
+
 rule samtools_merge:
     input:
         bam = lambda wildcards: expand(rules.minimap2_align.output[0],zip,**gather_cells(wildcards.sample),allow_missing=True) if wildcards.mapper == 'mm2' else expand(rules.pbmm2_align.output[0],zip,**gather_cells(wildcards.sample),allow_missing=True),
         csi = lambda wildcards: expand(rules.minimap2_align.output[1],zip,**gather_cells(wildcards.sample),allow_missing=True) if wildcards.mapper == 'mm2' else expand(rules.pbmm2_align.output[1],zip,**gather_cells(wildcards.sample),allow_missing=True)
     output:
-        multiext('alignments/{sample}.{mapper}.bam','','.csi')
+        multiext('alignments/{sample}.{mapper,mm2|pbmm2}.bam','','.csi')
     threads: 6
     resources:
         mem_mb = 5000
     shell:
         '''
         samtools merge -@ {threads} --write-index --reference {config[reference]} -c -o {output[0]} {input.bam}
+        '''
+
+rule fastp_filter:
+    input:
+        expand('/cluster/work/pausch/inputs/fastq/BTA_eQTL/{{sample}}_R{N}.fastq.gz',N=(1,2))
+    output:
+        fastq = temp(expand('fastq/{sample}.R{N}.fastq.gz',N=(1,2),allow_missing=True))
+    params:
+        min_quality = config.get('fastp',{}).get('min_quality',15),
+        unqualified = config.get('fastp',{}).get('unqualified',40),
+        min_length  = config.get('fastp',{}).get('min_length',15)
+    threads: 4
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        fastp -q {params.min_quality} -u {params.unqualified} -g --length_required {params.min_length} --thread {threads} -i {input[0]} -o {output.fastq[0]} -I {input[1]} -O {output.fastq[1]} --json /dev/null --html /dev/null
+        '''
+
+def generate_SR_aligner_command(wildcards,input):
+    match wildcards.mapper:
+        case 'strobe':
+            return f'strobealign {input.reference} {input.fastq} --rg-id {wildcards.sample}'
+        case 'bwa':
+            return f'bwa-mem2 mem -R "@RG\\tID:{wildcards.sample}\\tCN:UNK\\tLB:{wildcards.sample}\\tPL:illumina\\tSM:{wildcards.sample}" -Y {input.reference} {input.fastq}'
+        case _:
+            raise('Unknown aligner')
+
+rule short_read_align:
+    input:
+        fastq = expand(rules.fastp_filter.output,allow_missing=True),
+        reference = config['reference']
+    output:
+        bam = multiext('alignments/{sample}.{mapper,strobe|bwa}.cram','','.crai'),
+        dedup_stats = 'alignments/{sample}.{mapper}.dedup.stats'
+    params:
+        aligner_command = lambda wildcards, input: generate_SR_aligner_command(wildcards,input)
+    threads: lambda wildcards: 24 if wildcards.mapper == 'bwa' else 12
+    resources:
+        mem_mb = 3000,
+        scratch = '50g',
+        walltime = '4h'
+    shell:
+        '''
+        {params.aligner_command} -t {threads} |\
+        samtools collate -u -O -@ {threads} - |\
+        samtools fixmate -m -u -@ {threads} - - |\
+        samtools sort -T $TMPDIR -u -@ {threads} |\
+        samtools markdup -T $TMPDIR -S -@ {threads} --write-index -f {output.dedup_stats} --reference {input.reference} - {output.bam[0]}
         '''
