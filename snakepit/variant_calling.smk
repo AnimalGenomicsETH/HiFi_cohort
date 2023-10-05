@@ -1,19 +1,31 @@
 
 regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
+
+def get_DV_input(wildcards):
+    match wildcards.mapper:
+        case 'pbmm2' | 'mm2':
+            return expand(rules.samtools_merge.output,sample=samples,mapper=wildcards.mapper)
+        case 'bwa' | 'strobe':
+            return expand(rules.short_read_align.output,sample=samples,mapper=wildcards.mapper)
+
 rule deepvariant:
     input:
-        lambda wildcards: expand(rules.samtools_merge.output,sample=samples,mapper='mm2' if wildcards.mapper=='HiFi' else 'pbmm2'),
+        get_DV_input,
+        #lambda wildcards: expand(rules.samtools_merge.output,sample=samples,mapper='mm2' if wildcards.mapper=='HiFi' else 'pbmm2'),
         config = 'config/DV.yaml'
     output:
         expand('{mapper}_DV/{region}.Unrevised.vcf.gz',region=regions,allow_missing=True)
     params:
         name = lambda wildcards, output: PurePath(output[0]).parent,
-        model = lambda wildcards: 'WGS' if wildcards.mapper == 'SR' else 'PACBIO'
+        model = lambda wildcards: 'WGS' if wildcards.mapper in ['bwa','strobe'] else 'PACBIO',
+        bam = lambda wildcards, input: PurePath(input[0]).suffix,
+        index = lambda wildcards, input: PurePath(input[len(samples)]).suffix #'.csi' if wildcards.mapper in ['mm2','pbmm2'] else 'crai'
     localrule: True
     shell:
         '''
         snakemake -s /cluster/work/pausch/alex/BSW_analysis/snakepit/deepvariant.smk --configfile {input.config} \
-        --config Run_name="{params.name}" model="{params.model}" bam_name="{{sample}}.{wildcards.mapper}.bam" \
+        --config Run_name="{params.name}" model="{params.model}" \
+        bam_name="{{sample}}.{wildcards.mapper}{params.bam}" bam_index="{params.index}" \
         --profile "slurm/fullNT" --resources storage_load=500 --nolock
         '''
 
