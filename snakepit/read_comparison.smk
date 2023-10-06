@@ -1,13 +1,28 @@
 from pathlib import PurePath
 
+
+rule bcftools_split:
+    input:
+        '{mapper}_DV/{chromsome}.{imputed}.vcf.gz'
+    output:
+        expand('{mapper}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',sample=config['samples'],allow_missing=True)
+    params:
+        _dir = lambda wildcards, output: PurePath(output[0]).parent
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        bcftools +split -i 'GT[*]="alt"' -Oz -o {params._dir} {input}
+        '''
+
 rule happy:
     input:
-        vcf_SR = 'SR_DV/deepvariant/{sample}.all.vcf.gz',
-        vcf_HiFi = 'HiFi_DV/deepvariant/{sample}.all.vcf.gz',
+        vcf1 = '{read1}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',
+        vcf2 = '{read2}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',
         reference = config['reference']
     output:
-        csv = 'happy/{sample}.summary.csv',
-        others = multiext('happy/{sample}','.bcf','.bcf.csi','.extended.csv','.roc.all.csv.gz','.runinfo.json')
+        csv = 'happy_{read1}_{read2}/{sample}.{chromosome}.summary.csv',
+        others = multiext('happy_{read1}_{read2}/{sample}.{chromosome}','.bcf','.bcf.csi','.extended.csv','.roc.all.csv.gz','.runinfo.json')
     params:
         _dir = lambda wildcards, output: PurePath(output.csv).with_suffix('').with_suffix('')
     container: '/cluster/work/pausch/alex/software/images/hap.py_latest.sif'
@@ -17,14 +32,14 @@ rule happy:
         scratch = '10G'
     shell:
         '''
-        /opt/hap.py/bin/hap.py -r {input.reference} --bcf --usefiltered-truth --no-roc --no-json -L --pass-only --scratch-prefix $TMPDIR -X --threads {threads} -o {params._dir} {input.vcf_sequel} {input.vcf_revio}
+        /opt/hap.py/bin/hap.py -r {input.reference} --bcf --usefiltered-truth --no-roc --no-json -L --pass-only --scratch-prefix $TMPDIR -X --threads {threads} -o {params._dir} {input.vcf1} {input.vcf2}
         '''
 
 rule gather_happy:
     input:
-        expand(rules.happy.output[0],sample=samples)
+        expand(rules.happy.output[0],sample=samples,chromosomes=regions)
     output:
-        'happy/F1.csv'
+        'happy/{read1}_{read2}.F1.csv'
     localrule: True
     shell:
         '''
@@ -43,7 +58,6 @@ rule bcftools_isec:
     shell:
         '''
         bcftools isec -n +1 -c some {input.HiFi} {input.SR} > {output[0]}
-        
         '''
 
 rule samtools_coverage:
