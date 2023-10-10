@@ -28,7 +28,7 @@ rule happy:
     container: '/cluster/work/pausch/alex/software/images/hap.py_latest.sif'
     threads: 2
     resources:
-        mem_mb = 5000,
+        mem_mb = 15000,
         scratch = '10G',
         walltime = '30m',
         storage_load = 1
@@ -45,9 +45,9 @@ rule gather_happy:
     localrule: True
     shell:
         '''
-        echo -e "variant truth query recall precision truth_TiTv query_TiTv sample" > {output}
+        echo -e "variant truth query recall precision truth_TiTv query_TiTv sample chromosome" > {output}
         for i in {input}
         do
-          awk -v I=$(basename $i) -F',' '$2=="PASS" {{ split(I,a,"."); print $1,$3,$6,$10,$11,$14,$15,a[1] }}' $i >> {output}
+          awk -v I=$(basename $i) -F',' '$2=="PASS" {{ split(I,a,"."); print $1,$3,$6,$10,$11,$14,$15,a[1],a[2] }}' $i >> {output}
         done
         '''
