@@ -1,4 +1,6 @@
 
+ruleorder: bcftools_filter > sniffles_merge > sniffles_call
+
 regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
 
 def get_DV_input(wildcards):
@@ -93,11 +95,11 @@ rule pbsv_call:
 
 rule sniffles_call:
     input:
-        bam = expand(rules.samtools_merge.output,mapper='pbmm2',allow_missing=True),
+        bam = expand(rules.samtools_merge.output,allow_missing=True),
         TR = 'GCA_002263795.4_ARS-UCD1.3_genomic.trf.bed'
     output:
-        vcf = 'SVs/{sample}.sniffles.vcf.gz',
-	    snf = 'SVs/{sample}.sniffles.snf'
+        vcf = '{mapper}_SVs/{sample}.sniffles.vcf.gz',
+	    snf = '{mapper}_SVs/{sample}.sniffles.snf'
     threads: 4
     resources:
         mem_mb = 2000
@@ -110,10 +112,10 @@ rule sniffles_call:
 
 rule sniffles_merge:
     input:
-        snfs = expand(rules.sniffles_call.output['snf'],sample=samples),
+        snfs = expand(rules.sniffles_call.output['snf'],sample=samples,allow_missing=True),
         TR = 'GCA_002263795.4_ARS-UCD1.3_genomic.trf.bed'
     output:
-        vcf = 'SVs/cohort.sniffles.vcf.gz'
+        vcf = '{mapper}_SVs/cohort.sniffles.vcf.gz'
     threads: 12
     resources:
         mem_mb = 3000
@@ -121,21 +123,21 @@ rule sniffles_merge:
         'sniffles'
     shell:
         '''
-        sniffles --input {input.snfs} --reference {config[reference]} --tandem-repeats {input.TR} --combine-pair-relabel --threads {threads} --max-del-seq-len 100000 --vcf {output.vcf}
+        sniffles --input {input.snfs} --reference {config[reference]} --tandem-repeats {input.TR} --threads {threads} --max-del-seq-len 100000 --vcf {output.vcf}
         '''
 
 rule bcftools_filter:
     input:
         rules.sniffles_merge.output
     output:
-        multiext('SVs/InDels.sniffles.vcf.gz','','.tbi')
+        multiext('{mapper}_SVs/InDels.sniffles.vcf.gz','','.tbi')
     threads: 2
     resources:
         mem_mb = 2500
     shell:
         '''
         bcftools +fill-from-fasta {input} -- -c REF -f {config[reference]} |\
-        bcftools view --threads {threads} -i 'INFO/SVLEN<100000&&INFO/SVTYPE!="BND"' -o {output[0]}
+        bcftools view --threads {threads} -i 'INFO/SVLEN<1000000&&INFO/SVTYPE!="BND"' -o {output[0]}
         tabix -p vcf {output[0]}
         '''
 
