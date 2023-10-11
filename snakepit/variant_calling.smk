@@ -1,4 +1,3 @@
-
 ruleorder: bcftools_filter > sniffles_merge > sniffles_call
 
 regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
@@ -34,7 +33,6 @@ rule deepvariant:
 rule beagle4_impute:
     input:
         '{read_type}_DV/{region}.Unrevised.vcf.gz'
-        #rules.deepvariant.output
     output:
         multiext('{read_type}_DV/{region}.beagle4.vcf.gz','','.tbi')
     params:
@@ -137,8 +135,74 @@ rule bcftools_filter:
     shell:
         '''
         bcftools +fill-from-fasta {input} -- -c REF -f {config[reference]} |\
-        bcftools view --threads {threads} -i 'INFO/SVLEN<1000000&&INFO/SVTYPE!="BND"' -o {output[0]}
+        bcftools view --threads {threads} -i 'abs(INFO/SVLEN)<1000000&&INFO/SVTYPE!="BND"' -o {output[0]}
         tabix -p vcf {output[0]}
+        '''
+
+checkpoint split_SV_sequences:
+    input:
+        rules.bcftools_filter.output
+    output:
+        directory('{mapper}_SVs/SV_sequences')
+    shell:
+        '''
+        mkdir -p {output}
+        bcftools query -f '%ID\\t%REF\\t%ALT\\n' {input[0]} | awk 'length($2)>length($3) {{print ">"$1"\\n"$2;next}} {{print ">"$1"\\n"$3}}' |\
+        split -l 10000 -d -a 4 --additional-suffix ".fa" - {output}/
+        '''
+
+rule repeat_masker:
+    input:
+        '{mapper}_SVs/SV_sequences/{chunk}.fa',
+    output:
+        '{mapper}_SVs/SV_sequences/{chunk}.fa.out'
+    threads: 2
+    resources:
+        mem_mb = 1500,
+        walltime = '4h'
+    shell:
+        '''
+        RepeatMasker -xsmall -pa $(({threads}/1)) -e rmblast -lib {config[repeat_library]} -qq -no_is {input}
+        if [ ! -f {output} ]; then
+          seqtk seq -l60 {input} > {output}
+        fi
+        '''
+
+rule TRF:
+    input:
+        '{mapper}_SVs/SV_sequences/{chunk}.fa'
+    output:
+        '{mapper}_SVs/SV_sequences/{chunk}.fa.trf'
+    shell:
+        '''
+        TRF {input} 2 5 7 80 10 50 2000 -h -ngs > {output}
+        '''
+
+def aggregate_out_chunks(wildcards):
+    checkpoint_output = checkpoints.split_SV_sequences.get(**wildcards).output[0]
+    return expand('{fpath}/{chunk}.fa.out',fpath=checkpoint_output,chunk=glob_wildcards(PurePath(checkpoint_output).joinpath('{chunk}.fa')).chunk)
+
+def aggregate_trf_chunks(wildcards):
+    checkpoint_output = checkpoints.split_SV_sequences.get(**wildcards).output[0]
+    return expand('{fpath}/{chunk}.fa.trf',fpath=checkpoint_output,chunk=glob_wildcards(PurePath(checkpoint_output).joinpath('{chunk}.fa')).chunk)
+
+rule merge_masked_chromosomes:
+    input:
+        out = aggregate_out_chunks,
+        trf = aggregate_trf_chunks
+    output:
+        out = '{mapper}_SVs/SV_sequences.out.gz',
+        trf = '{mapper}_SVs/SV_sequences.trf.gz'
+    localrule: True
+    shell:
+        '''
+        cat {input.out} | bgzip --threads {threads} -c > {output.out}
+        cat {input.trf} | bgzip --threads {threads} -c > {output.trf}
+
+        #awk -v c=0 '{{if (/@/) {{S="N"; next}} }} {{ if (S=="N"&&$5>6&&$4>=5) {{++c; S="Y"}} }} END {{print c}}' *.fa.trf 
+        #grep -hP "\sLTR/" *out | /cluster/work/pausch/alex/software/RepeatMasker/util/buildSummary.pl - | awk '/^Sniffles2/&&$3>100 {{print $1}}' > ltr
+        #grep -hP "/RTE" *out | /cluster/work/pausch/alex/software/RepeatMasker/util/buildSummary.pl - | awk '/^Sniffles2/&&$3>100 {{print $1}}' > rte
+        #comm -12 <(sort ltr) <(sort rte) | wc -l
         '''
 
 rule hiphase:
