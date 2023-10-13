@@ -12,7 +12,6 @@ def get_DV_input(wildcards):
 rule deepvariant:
     input:
         get_DV_input,
-        #lambda wildcards: expand(rules.samtools_merge.output,sample=samples,mapper='mm2' if wildcards.mapper=='HiFi' else 'pbmm2'),
         config = 'config/DV.yaml'
     output:
         expand('{mapper}_DV/{region}.Unrevised.vcf.gz',region=regions,allow_missing=True)
@@ -20,7 +19,7 @@ rule deepvariant:
         name = lambda wildcards, output: PurePath(output[0]).parent,
         model = lambda wildcards: 'WGS' if wildcards.mapper in ['bwa','strobe'] else 'PACBIO',
         bam = lambda wildcards, input: PurePath(input[0]).suffix,
-        index = lambda wildcards, input: PurePath(input[len(samples)]).suffix #'.csi' if wildcards.mapper in ['mm2','pbmm2'] else 'crai'
+        index = lambda wildcards, input: PurePath(input[len(samples)]).suffix
     localrule: True
     shell:
         '''
@@ -32,9 +31,9 @@ rule deepvariant:
 
 rule beagle4_impute:
     input:
-        '{read_type}_DV/{region}.Unrevised.vcf.gz'
+        '{mapper}_DV/{region}.Unrevised.vcf.gz'
     output:
-        multiext('{read_type}_DV/{region}.beagle4.vcf.gz','','.tbi')
+        multiext('{mapper}_DV/{region}.beagle4.vcf.gz','','.tbi')
     params:
         prefix = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix(''),
         name = lambda wildcards, output: PurePath(output[0]).name
@@ -54,7 +53,7 @@ rule bcftools_concat:
     input:
         expand(rules.beagle4_impute.output[0],allow_missing=True)
     output:
-        multiext('{read_type}_DV/all.beagle4.vcf.gz','','.tbi')
+        multiext('{mapper}_DV/all.beagle4.vcf.gz','','.tbi')
     shell:
         '''
         bcftools concat {input} > {output}
@@ -126,16 +125,43 @@ rule sniffles_merge:
 
 rule bcftools_filter:
     input:
-        rules.sniffles_merge.output
+        rules.sniffles_merge.output,
+        regions = '/cluster/work/pausch/vcf_UCD/2023_07/regions.bed'
     output:
-        multiext('{mapper}_SVs/InDels.sniffles.vcf.gz','','.tbi')
+        multiext('{mapper}_SVs/filtered/{region}.vcf.gz','','.csi')
+    params:
+        regions = regions,
+        _dir = lambda wildcards, output: PurePath(output[0]).parent#ith_suffix('').with_suffix('').with_suffix('').with_suffix('')
     threads: 2
     resources:
         mem_mb = 2500
     shell:
         '''
         bcftools +fill-from-fasta {input} -- -c REF -f {config[reference]} |\
-        bcftools view --threads {threads} -i 'abs(INFO/SVLEN)<1000000&&INFO/SVTYPE!="BND"' -o {output[0]}
+        bcftools view --threads {threads} -i 'abs(INFO/SVLEN)<1000000&&INFO/SVTYPE!="BND"' |\
+        bcftools +scatter - -o {params._dir} -Oz --threads {threads} --write-index -S {input.regions} -x unplaced --no-version
+        '''
+
+rule merge_QTL_variants:
+    input:
+        small = rules.beagle4_impute.output,
+        SV = rules.bcftools_filter.output
+    output:
+        multiext('QTL_variants/{region}.{mapper}.merged.vcf.gz','','.tbi')
+    threads: 2
+    resources:
+        mem_mb = 1500,
+        walltime = '30m'
+    shell:
+        '''
+        bcftools norm --threads {threads} -f {config[reference]} -m -any -Ou {input.small[0]} |\
+        bcftools sort -T $TMPDIR -Ou - |\
+        bcftools annotate --threads {threads} --set-id '%CHROM\_%POS\_%TYPE\_%REF\_%ALT' -o $TMPDIR/small.vcf.gz
+        tabix -p vcf $TMPDIR/small.vcf.gz
+
+        bcftools concat --allow-overlaps --threads {threads} -Ou {input.SV[0]} $TMPDIR/small.vcf.gz |\
+        bcftools +fill-tags - -o {output[0]} -- -t all
+
         tabix -p vcf {output[0]}
         '''
 
