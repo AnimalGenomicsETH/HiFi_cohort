@@ -7,9 +7,10 @@ samples = sorted(list(HiFi_dataframe['Sample'].unique()))
 
 include: 'snakepit/alignment.smk'
 include: 'snakepit/variant_calling.smk'
+include: 'snakepit/read_comparison.smk'
 include: 'snakepit/methylation.smk'
 
-#workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
+workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
 
 wildcard_constraints:
     sample = r'\w+'
