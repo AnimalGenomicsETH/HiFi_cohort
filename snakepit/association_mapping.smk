@@ -70,11 +70,11 @@ rule qtltools_gather:
     output:
         'QTL/{QTL}/{tissue}_{variants}/{_pass}.{MAF}.txt.gz'
     params:
-        sort_key = lambda wildcards: '-k9,9n -k10,10n' if wildcards.QTL == 'eQTL' else '-k11,11n -k12,12n'
+        sort_key = lambda wildcards: '-k9,9Vr -k10,10n' if wildcards.QTL == 'eQTL' else '-k11,11Vr -k12,12n'
     localrule: True
     shell:
         '''
-        LC_ALL=C; pigz -p 2 -dc {input} | grep -Fv "NA NA" | sort --parallel=2 {params.sort_key} | pigz -p 2 -c > {output}
+        LC_ALL=C; pigz -p 2 -dc {input} | sort --parallel=2 {params.sort_key} | pigz -p 2 -c > {output}
         '''
 
 rule qtltools_FDR:
