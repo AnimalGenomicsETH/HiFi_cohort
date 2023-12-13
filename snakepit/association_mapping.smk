@@ -2,6 +2,7 @@ from pathlib import PurePath
 
 wildcard_constraints:
     _pass = r'permutations|conditionals|nominals',
+    tissue = r'Testis',
     chunk = r'\d+',
     chrom = r'\d+',
     MAF = r'\d+',
@@ -9,8 +10,7 @@ wildcard_constraints:
 
 rule normalise_vcf:
     input:
-        'QTXL_variants/autosomes.vcf.gz'
-        #lambda wildcards: expand(rules.merge_with_population_SR.output,pangenie_mode='genotyping',allow_missing=True) if wildcards.variants == 'PanGenie' else config['small_variants']
+        lambda wildcards: config['variants'][wildcards.variants]
     output:
         'QTL/{variants}.vcf.gz'
     threads: 4
@@ -27,8 +27,7 @@ rule normalise_vcf:
 
 rule exclude_MAF:
     input:
-        'QTL_variants/autosomes.vcf.gz'
-        #rules.normalise_vcf.output
+        lambda wildcards: config['variants'][wildcards.variants]
     output:
         'QTL/{variants}.exclude_sites.{MAF}.txt'
     shell:
@@ -47,7 +46,7 @@ def get_pass(_pass,input):
 
 rule qtltools_parallel:
     input:
-        vcf = 'QTL_variants/autosomes.vcf.gz',#rules.normalise_vcf.output,
+        vcf = lambda wildcards: config['variants'][wildcards.variants],
         exclude = rules.exclude_MAF.output,
         bed = lambda wildcards: config['mol_QTLs'][wildcards.QTL][wildcards.tissue],
         cov = lambda wildcards: config['covariates'][wildcards.QTL][wildcards.tissue],
