@@ -74,7 +74,7 @@ rule qtltools_gather:
     localrule: True
     shell:
         '''
-        LC_ALL=C; pigz -p 2 -dc {input} | sort --parallel=2 {params.sort_key} | pigz -p 2 -c > {output}
+        LC_ALL=C; pigz -p 2 -dc {input} | grep -Fv "NA NA" | sort --parallel=2 {params.sort_key} | pigz -p 2 -c > {output}
         '''
 
 rule qtltools_FDR:
