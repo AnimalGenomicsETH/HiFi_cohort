@@ -44,8 +44,6 @@ def gather_cells(sample):
         zipper['methylation'].append("5mC" if row["Kinetics"] == "No" else "m6a")
     return zipper
 
-
-
 rule samtools_merge:
     input:
         bam = lambda wildcards: expand(rules.minimap2_align.output[0],zip,**gather_cells(wildcards.sample),allow_missing=True) if wildcards.mapper == 'mm2' else expand(rules.pbmm2_align.output[0],zip,**gather_cells(wildcards.sample),allow_missing=True),
@@ -59,6 +57,31 @@ rule samtools_merge:
         '''
         samtools merge -@ {threads} --write-index --reference {config[reference]} -c -o {output[0]} {input.bam}
         '''
+
+rule cramino_stats:
+    input:
+        rules.samtools_merge.output[0]
+    output:
+        'alignments/{sample}.{mapper}.stats'
+    threads: 4
+    resources:
+        mem_mb = 5000
+    shell:
+        '''
+        cramino --reference {config[reference]} -t {threads} -s {wildcards.sample} {input} > {output}
+        '''
+
+rule gather_alignment_stats:
+    input:
+        expand(rules.cramino_stats.output,sample=config['samples'],allow_missing=True)
+    output:
+        'alignments/{mapper}.stats.csv'
+    localrule: True
+    shell:
+        '''
+        {{ echo "sample,cell,gigabases,reads,read N50,read length,QV" ; cat {input} ; }} > {output}
+        '''
+
 
 rule fastp_filter:
     input:
@@ -95,11 +118,11 @@ rule short_read_align:
         dedup_stats = 'alignments/{sample}.{mapper}.dedup.stats'
     params:
         aligner_command = lambda wildcards, input: generate_SR_aligner_command(wildcards,input)
-    threads: lambda wildcards: 24 if wildcards.mapper == 'bwa' else 12
+    threads: 16 #lambda wildcards: 24 if wildcards.mapper == 'bwa' else 12
     resources:
         mem_mb = 3000,
         scratch = '50g',
-        walltime = '4h'
+        walltime = '24h'
     shell:
         '''
         {params.aligner_command} -t {threads} |\
