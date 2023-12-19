@@ -39,23 +39,26 @@ rule methbat_profile:
         'methylation/merged.bed'
     shell:
         '''
-        methbat profile --input-prefix {params.prefix}
+        methbat profile --input-prefix {params.prefix} --output-region-profile {output}
         '''
 
 rule methbat_build:
     input:
-        ''
+        collection = '',
+        profiles = expand(rules.methbat_profile.output)
     output:
         ''
     shell:
         '''
+        methbat build --input-collection {input.collection} --output-profile {output.profile}
         '''
 
 rule methbat_compare:
     input:
-        ''
+        rules.methbat_build.output
     output:
         ''
     shell:
         '''
+        methbat compare --input-profile {input} --output-comparison {output}
         '''
