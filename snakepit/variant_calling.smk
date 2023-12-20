@@ -1,4 +1,5 @@
 ruleorder: bcftools_filter > sniffles_merge > sniffles_call
+ruleorder: bcftools_concat > beagle4_impute
 
 regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
 
@@ -8,26 +9,6 @@ def get_DV_input(wildcards):
             return expand(rules.samtools_merge.output,sample=samples,mapper=wildcards.mapper)
         case 'bwa' | 'strobe':
             return expand(rules.short_read_align.output,sample=samples,mapper=wildcards.mapper)
-
-rule deepvariant:
-    input:
-        get_DV_input,
-        config = 'config/DV.yaml'
-    output:
-        expand('{mapper}_DV/{region}.Unrevised.vcf.gz',region=regions,allow_missing=True)
-    params:
-        name = lambda wildcards, output: PurePath(output[0]).parent,
-        model = lambda wildcards: 'WGS' if wildcards.mapper in ['bwa','strobe'] else 'PACBIO',
-        bam = lambda wildcards, input: PurePath(input[0]).suffix,
-        index = lambda wildcards, input: PurePath(input[len(samples)]).suffix
-    localrule: True
-    shell:
-        '''
-        snakemake -s /cluster/work/pausch/alex/BSW_analysis/snakepit/deepvariant.smk --configfile {input.config} \
-        --config Run_name="{params.name}" model="{params.model}" \
-        bam_name="{{sample}}.{wildcards.mapper}{params.bam}" bam_index="{params.index}" \
-        --profile "slurm/fullNT" --resources storage_load=500 --nolock
-        '''
 
 rule beagle4_impute:
     input:
@@ -49,14 +30,17 @@ rule beagle4_impute:
         tabix -fp vcf {output[0]}
         '''
 
+
 rule bcftools_concat:
     input:
-        expand(rules.beagle4_impute.output[0],allow_missing=True)
+        expand(rules.beagle4_impute.output[0],region=regions,allow_missing=True)
     output:
         multiext('{mapper}_DV/all.beagle4.vcf.gz','','.tbi')
+    localrule: True
     shell:
         '''
-        bcftools concat {input} > {output}
+        bcftools concat --threads {threads} --naive-force --no-version {input} > {output[0]}
+        tabix -p vcf {output[0]}
         '''
 
 rule pbsv_discover:
@@ -125,12 +109,11 @@ rule sniffles_merge:
 
 rule bcftools_filter:
     input:
-        rules.sniffles_merge.output,
-        regions = '/cluster/work/pausch/vcf_UCD/2023_07/regions.bed'
+        rules.sniffles_merge.output
     output:
         multiext('{mapper}_SVs/filtered/{region}.vcf.gz','','.csi')
     params:
-        regions = regions,
+        regions = ','.join(regions[:-1]),
         _dir = lambda wildcards, output: PurePath(output[0]).parent#ith_suffix('').with_suffix('').with_suffix('').with_suffix('')
     threads: 2
     resources:
@@ -138,8 +121,8 @@ rule bcftools_filter:
     shell:
         '''
         bcftools +fill-from-fasta {input} -- -c REF -f {config[reference]} |\
-        bcftools view --threads {threads} -i 'abs(INFO/SVLEN)<1000000&&INFO/SVTYPE!="BND"' |\
-        bcftools +scatter - -o {params._dir} -Oz --threads {threads} --write-index -S {input.regions} -x unplaced --no-version
+        bcftools view --threads {threads} -i 'abs(INFO/SVLEN)<=100000&&INFO/SVTYPE!="BND"' |\
+        bcftools +scatter - -o {params._dir} -Oz --threads {threads} --write-index -s {params.regions} -x unplaced --no-version
         '''
 
 rule merge_QTL_variants:
@@ -162,6 +145,18 @@ rule merge_QTL_variants:
         bcftools concat --allow-overlaps --threads {threads} -Ou {input.SV[0]} $TMPDIR/small.vcf.gz |\
         bcftools +fill-tags - -o {output[0]} -- -t all
 
+        tabix -p vcf {output[0]}
+        '''
+
+rule bcftools_concat_QTL:
+    input:
+        expand(rules.merge_QTL_variants.output[0],mapper='mm2',region=regions[:-1])
+    output:
+        multiext('QTL_variants/chromosomes.vcf.gz','','.tbi')
+    localrule: True
+    shell:
+        '''
+        bcftools concat --threads {threads} --naive-force --no-version {input} > {output[0]}
         tabix -p vcf {output[0]}
         '''
 
@@ -233,18 +228,27 @@ rule merge_masked_chromosomes:
 
 rule hiphase:
     input:
-        bam = rules.samtools_merge.output,
-        vcf_snv = 'vcf.gz',
-        reference = config['reference']
+        bam = expand(rules.samtools_merge.output,mapper='mm2',allow_missing=True),
+        #small = 'QTL_variants/6.mm2.merged.vcf.gz',#'QTL_variants/osomes.small.vcf.gz',
+        #SV = 'QTL_variants/chromosomes.SV.vcf.gz',
+        small = rules.bcftools_concat_QTL.output, #expand(rules.rules.merge_QTL_variants.output,mapper='mm2
+        #merge_QTL_variants.output,mapper='mm2',region=('1',),allow_missing=True), #expand(rules.bcftools_concat.output,mapper='mm2',allow_missing=True),#'/cluster/work/pausch/HiFi_QTL/QTL_variants/chromosomes.vcf.gz',# expand(rules.beagle4_impute.output,mapper='mm2',allow_missing=True),
     output:
-        cram = "{sample}/{sample}.mm2.haplotagged.cram",
-        vcf_snv = "{sample}/{sample}.mm2.DV.phased.vcf.gz",
-        summary = multiext("{sample}/{sample}.mm2.phased",".summary.tsv","stats.tvt","blocks.tsv")
-    threads: 16
+        bam = multiext("alignments/{sample}.mm2.haplotagged.bam",'','.bai'),
+        small = multiext("variants/{sample}.mm2.DV.phased.vcf.gz",'','.tbi'),
+        summary = multiext("variants/{sample}.mm2.phased",".summary.tsv",".stats.tsv",".blocks.tsv")
+    threads: 8
     resources:
         mem_mb = 1500,
         walltime = '4h'
     shell:
         '''
-        hiphase -t {threads} -r {input.reference} -b {input.cram} -p {output.cram} -c {input.vcf} -o {output.vcf} -s {wildcards.sample} --summary-file {output.summary[0]} --stats-file {output.summary[1]} --blocks-file {output.summary[2]}
+        hiphase --threads {threads} --reference {config[reference]} \
+        --bam {input.bam[0]} --output-bam {output.bam[0]} \
+        --vcf {input.small[0]} --output-vcf {output.small[0]} \
+        --sample-name {wildcards.sample} \
+        --global-realignment-cputime 300 \
+        --min-vcf-qual 20 \
+        --phase-singletons \
+        --summary-file {output.summary[0]} --stats-file {output.summary[1]} --blocks-file {output.summary[2]}
         '''
