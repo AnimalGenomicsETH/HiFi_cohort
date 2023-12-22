@@ -1,9 +1,10 @@
-
 import pandas as pd
 from pathlib import PurePath
 
 HiFi_dataframe = pd.read_csv(config['sample_sheet'])
 samples = sorted(list(HiFi_dataframe['Sample'].unique()))
+
+regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
 
 include: 'snakepit/alignment.smk'
 include: 'snakepit/variant_calling.smk'
@@ -12,8 +13,11 @@ include: 'snakepit/methylation.smk'
 
 workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
 
+
 wildcard_constraints:
-    sample = r'\w+'
+    sample = r'BSWCHEM\d+',
+    regions = r'|'.join(regions),
+    mapper = r'bwa|strobe|mm2|pbmm2'
 
 rule all:
     input:

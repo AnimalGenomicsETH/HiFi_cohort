@@ -1,8 +1,6 @@
 ruleorder: bcftools_filter > sniffles_merge > sniffles_call
 ruleorder: bcftools_concat > beagle4_impute
 
-regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
-
 def get_DV_input(wildcards):
     match wildcards.mapper:
         case 'pbmm2' | 'mm2':
@@ -273,7 +271,7 @@ rule hiphase_chromosome:
 
 rule summarise_phasing_chromosome:
     input:
-        expand('phasing/summary.{region}.txt',region=regions[15:-1])
+        expand('phasing/summary.{region}.txt',region=regions[:-1])
     output:
         'phasing/summary.csv'
     localrule: True
