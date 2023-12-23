@@ -15,7 +15,7 @@ rule fibertools_predict_m6a:
 
 rule pb_CpG_tools:
     input:
-        bam = rules.hiphase.output['bam']
+        bam = rules.samtools_merge_phased.output
     output:
         bed = "methylation/{sample}.{mapper}.combined.bed",
         BigWig = "methylation/{sample}.{mapper}.combined.bw"
@@ -48,25 +48,38 @@ rule prepare_CpGs:
 
 rule methbat_profile:
     input:
-        expand(rules.pb_CpG_tools.output['bed'],sample=samples,mapper='mm2')
+        bed = expand(rules.pb_CpG_tools.output['bed'],mapper='mm2',allow_missing=True),
+        CpGs = rules.prepare_CpGs.output
     output:
-        'methylation/merged.bed'
+        profile = 'methylation/{sample}.BAT.profile',
+        ASM = 'methylation/{sample}.BAT.ASM'
+    params:
+        prefix = lambda wildcards, input: PurePath(input['bed'][0]).with_suffix('').with_suffix('')
+    threads: 1
+    resources:
+        mem_mb = 5000,
+        walltime = '30m'
     shell:
         '''
-        methbat profile --input-prefix {params.prefix} --output-region-profile {output}
+        methbat profile --input-prefix {params.prefix} --input-regions {input.CpGs} --output-region-profile {output.profile} --output-asm-bed {output.ASM}
         '''
 
 rule methbat_build:
     input:
-        collection = '',
-        profiles = expand(rules.methbat_profile.output)
+        collection = expand(rules.methbat_profile.output['profile'],sample=samples)
     output:
-        ''
+        profile = 'methylation/cohort.BAT'
+    params:
+        collection = lambda wildcards, input: 'identifier\\tfilename\\tlabels\\n'+'\\n'.join(f'{S}\\t{P}\\tMALE' for S,P in zip(samples,input.collection))
+    resources:
+        mem_mb = 15000
     shell:
         '''
-        methbat build --input-collection {input.collection} --output-profile {output.profile}
+        methbat build --input-collection <(echo -e "{params.collection}") --output-profile {output.profile}
         '''
 
+
+## re-profile using background as well as compare
 rule methbat_compare:
     input:
         rules.methbat_build.output
