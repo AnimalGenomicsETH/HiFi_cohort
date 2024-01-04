@@ -277,13 +277,13 @@ rule summarise_phasing_chromosome:
     localrule: True
     shell:
         '''
-        echo "sample_name chromosome num_variants num_heterozygous num_phased num_blocks block_ng50" > {output}
+        echo "sample_name chromosome num_variants num_heterozygous num_phased num_blocks basepairs_per_block_max block_ng50" > {output}
         for R in {input}
         do
           filename=$(basename -- "$R")
           filename="${{filename%.*}}"
           filename="${{filename##*.}}"
-          awk -v I=$filename '$2==I {{print $1,$2,$3,$4,$5,$9,$NF}}' $R  >> {output}
+          awk -v I=$filename '$2==I {{print $1,$2,$3,$4,$5,$9,$19,$NF}}' $R  >> {output}
         done
         '''
 
