@@ -82,10 +82,30 @@ rule methbat_build:
 ## re-profile using background as well as compare
 rule methbat_compare:
     input:
-        rules.methbat_build.output
+        bed = expand(rules.pb_CpG_tools.output['bed'],mapper='mm2',allow_missing=True),
+        profile = rules.methbat_profile.output.profile,
+        background = rules.methbat_build.output
     output:
-        ''
+        profile = 'methylation/{sample}.BAT.cohort.profile',
+        ASM = 'methylation/{sample}.BAT.cohort.ASM'
+    params:
+        prefix = lambda wildcards, input: PurePath(input['bed'][0]).with_suffix('').with_suffix('')
+    resources:
+        mem_mb = 5000,
+        walltime = '30m'
     shell:
         '''
-        methbat compare --input-profile {input} --output-comparison {output}
+        methbat profile --input-prefix {params.prefix} --input-regions {input.background} --output-region-profile {output.profile} --output-asm-bed {output.ASM}
+        #methbat compare --input-profile {input} --output-comparison {output}
+        '''
+
+rule methbat_gather:
+    input:
+        expand(rules.methbat_compare.output,sample=samples)
+    output:
+        'methylation/cohort.profiles'
+    localrule: True
+    shell:
+        '''
+        touch {output}
         '''
