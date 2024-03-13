@@ -8,6 +8,18 @@ def get_DV_input(wildcards):
         case 'bwa' | 'strobe':
             return expand(rules.short_read_align.output,sample=samples,mapper=wildcards.mapper)
 
+rule bcftools_split_Y_PAR:
+    input:
+        '{mapper}_DV/Y.Unrevised.vcf.gz'
+    output:
+        expand('{{mapper}}_DV/{region}.Unrevised.vcf.gz',region=('Y_PAR','Y_HAPLOID'))
+    shell:
+        '''
+        bcftools +scatter {input} -o $TMPDIR -Oz -S <(echo -e "Y:1-6822380\\tY_PAR\\nY:6822380-59476289\\tY_HAPLOID") --write-index
+        mv $TMPDIR/Y_PAR.vcf.gz {output[0]}
+        mv $TMPDIR/Y_HAPLOID.vcf.gz {output[1]}
+        '''
+
 rule beagle4_impute:
     input:
         '{mapper}_DV/{region}.Unrevised.vcf.gz'
@@ -22,7 +34,7 @@ rule beagle4_impute:
         walltime = '4h'
     shell:
         '''
-        java -jar -Xss25m -Xmx50G /cluster/work/pausch/alex/software/beagle.27Jan18.7e1.jar gl={input} nthreads={threads} out={params.prefix}
+        java -jar -Xss25m -Xmx50G /cluster/work/pausch/alex/software/beagle.27Jan18.7e1.jar gt={input} nthreads={threads} out={params.prefix}
         cp {output[0]} $TMPDIR/{params.name}
         bcftools reheader -f {config[reference]}.fai -o {output[0]} $TMPDIR/{params.name}
         tabix -fp vcf {output[0]}
@@ -75,9 +87,9 @@ rule pbsv_call:
 rule sniffles_call:
     input:
         bam = expand(rules.samtools_merge.output,allow_missing=True),
-        TR = 'GCA_002263795.4_ARS-UCD1.3_genomic.trf.bed'
+        TR = 'GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed'
     output:
-        vcf = '{mapper}_SVs/{sample}.sniffles.vcf.gz',
+        vcf = '{mapper}_SVs/{sample}.sniffles.denovo.vcf.gz',
 	    snf = '{mapper}_SVs/{sample}.sniffles.snf'
     threads: 4
     resources:
@@ -92,9 +104,9 @@ rule sniffles_call:
 rule sniffles_merge:
     input:
         snfs = expand(rules.sniffles_call.output['snf'],sample=samples,allow_missing=True),
-        TR = 'GCA_002263795.4_ARS-UCD1.3_genomic.trf.bed'
+        TR = 'GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed'
     output:
-        vcf = '{mapper}_SVs/cohort.sniffles.vcf.gz'
+        vcf = '{mapper}_SVs/cohort.sniffles.denovo.vcf.gz'
     threads: 12
     resources:
         mem_mb = 3000
@@ -103,6 +115,20 @@ rule sniffles_merge:
     shell:
         '''
         sniffles --input {input.snfs} --reference {config[reference]} --tandem-repeats {input.TR} --threads {threads} --max-del-seq-len 100000 --vcf {output.vcf}
+        '''
+
+rule sniffles_genotype:
+    input:
+        bam = expand(rules.samtools_merge.output,allow_missing=True),
+        TR = 'GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed',
+        SV_panel = rules.sniffles_merge.output[0]
+    output:
+        vcf = '{mapper}_SVs/{sample}.sniffles.forced.vcf.gz'
+    conda:
+        'sniffles'
+    shell:
+        '''
+        sniffles --input {input.bam} --reference {config[reference]} --tandem-repeats {input.TR} --sample-id {wildcards.sample} --threads {threads} --max-del-seq-len 100000 --genotype-vcf {input.SV_panel} --vcf {output.vcf}
         '''
 
 rule bcftools_filter:
@@ -160,12 +186,14 @@ rule bcftools_concat_QTL:
 
 checkpoint split_SV_sequences:
     input:
-        rules.bcftools_filter.output
+        '{mapper}_SVs/InDels_clean_chromosomes.sniffles.vcf.gz'
+        #rules.bcftools_concat_QTL.output
     output:
         directory('{mapper}_SVs/SV_sequences')
     shell:
         '''
         mkdir -p {output}
+        #-i 'abs(ILEN)>=50'
         bcftools query -f '%ID\\t%REF\\t%ALT\\n' {input[0]} | awk 'length($2)>length($3) {{print ">"$1"\\n"$2;next}} {{print ">"$1"\\n"$3}}' |\
         split -l 10000 -d -a 4 --additional-suffix ".fa" - {output}/
         '''
