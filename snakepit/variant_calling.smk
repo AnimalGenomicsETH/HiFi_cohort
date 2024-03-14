@@ -117,18 +117,48 @@ rule sniffles_merge:
         sniffles --input {input.snfs} --reference {config[reference]} --tandem-repeats {input.TR} --threads {threads} --max-del-seq-len 100000 --vcf {output.vcf}
         '''
 
+rule sniffles_filter:
+    input:
+        rules.sniffles_merge.output[0]
+    output:
+        '{mapper}_SVs/cohort.sniffles.denovo.filtered.vcf.gz'
+    threads: 1
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        bcftools +fill-from-fasta {input} -- -c REF -f {config[reference]} |\
+        bcftools view --threads {threads} -i 'abs(INFO/SVLEN)<=1000000&&INFO/SVTYPE!="BND"' -o {output} --write-index
+        '''
+
 rule sniffles_genotype:
     input:
         bam = expand(rules.samtools_merge.output,allow_missing=True),
         TR = 'GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed',
-        SV_panel = rules.sniffles_merge.output[0]
+        SV_panel = rules.sniffles_filter.output
     output:
         vcf = '{mapper}_SVs/{sample}.sniffles.forced.vcf.gz'
+    threads: 4
+    resources:
+        mem_mb = 2500
     conda:
         'sniffles'
     shell:
         '''
-        sniffles --input {input.bam} --reference {config[reference]} --tandem-repeats {input.TR} --sample-id {wildcards.sample} --threads {threads} --max-del-seq-len 100000 --genotype-vcf {input.SV_panel} --vcf {output.vcf}
+        sniffles --input {input.bam[0]} --reference {config[reference]} --tandem-repeats {input.TR} --sample-id {wildcards.sample} --threads {threads} --max-del-seq-len 100000 --genotype-vcf {input.SV_panel} --vcf {output.vcf}
+        '''
+
+rule bcftools_merge_sniffles:
+    input:
+        expand(rules.sniffles_genotype.output['vcf'],sample=samples,allow_missing=True)
+    output:
+        vcf = '{mapper}_SVs/cohort.sniffles.forced.vcf.gz'
+    threads: 2
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        bcftools merge --write-index -o {output} {input}
         '''
 
 rule bcftools_filter:

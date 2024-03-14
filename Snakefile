@@ -16,7 +16,7 @@ workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).pare
 
 wildcard_constraints:
     sample = r'BSWCHEM\d+',
-    regions = r'|'.join(regions),
+    regions = r'|'.join(regions) + r'|Y_PAR|Y_HAPLOID',
     mapper = r'bwa|strobe|mm2|pbmm2'
 
 rule all:
