@@ -8,6 +8,39 @@ def get_DV_input(wildcards):
         case 'bwa' | 'strobe':
             return expand(rules.short_read_align.output,sample=samples,mapper=wildcards.mapper)
 
+rule deepvariant:
+    input:
+        get_DV_input
+    output:
+        expand('{mapper}_DV/{region}.Unrevised.vcf.gz',region=regions,allow_missing=True)
+    params:
+        name = lambda wildcards, output: PurePath(output[0]).parent,
+        model = lambda wildcards: 'WGS' if wildcards.mapper in ['bwa','strobe'] else 'PACBIO',
+        bam = lambda wildcards, input: PurePath(input[0]).suffix,
+        index = lambda wildcards, input: PurePath(input[len(samples)]).suffix,
+        config = 'config/deepvariant.yaml'
+    localrule: True
+    shell:
+        '''
+        snakemake -s /cluster/work/pausch/alex/BSW_analysis/snakepit/deepvariant.smk --configfile {params.config} \
+        --config Run_name="{params.name}" model="{params.model}" \
+        bam_name="{{sample}}.{wildcards.mapper}{params.bam}" bam_index="{params.index}" \
+        --profile "slurm/fullNT" --resources storage_load=500 --nolock
+        '''
+
+rule bcftools_filter_DV:
+    input:
+        '{mapper}_DV/{region}.Unrevised.vcf.gz'
+    output:
+        '{mapper}_DV/{region}.filtered.vcf.gz'
+    params:
+        filter_expr = lambda wildcards: "'F_MISSING<0.2'"
+    shell:
+        '''
+        bcftools view -i {params.filter_expr} -o {output} {input}
+        tabix -p vcf {output}
+        '''
+
 rule bcftools_split_Y_PAR:
     input:
         '{mapper}_DV/Y.Unrevised.vcf.gz'
@@ -34,12 +67,24 @@ rule beagle4_impute:
         walltime = '4h'
     shell:
         '''
-        java -jar -Xss25m -Xmx50G /cluster/work/pausch/alex/software/beagle.27Jan18.7e1.jar gt={input} nthreads={threads} out={params.prefix}
+        java -jar -Xss25m -Xmx50G /cluster/work/pausch/alex/software/beagle.27Jan18.7e1.jar gl={input} nthreads={threads} out={params.prefix}
         cp {output[0]} $TMPDIR/{params.name}
         bcftools reheader -f {config[reference]}.fai -o {output[0]} $TMPDIR/{params.name}
         tabix -fp vcf {output[0]}
         '''
 
+rule bcftools_filter_beagle:
+    input:
+        rules.beagle4_impute.output
+    output:
+        multiext('{mapper}_DV/{region}.beagle4_filtered.vcf.gz','','.tbi')
+    params:
+        filter_expr = lambda wildcards: f"-i 'DR2<0.7'{' -g ^het' if wildcards.region not in ('X','Y_HAPLOID') else None}"
+    shell:
+        '''
+        bcftools view {params.filter_expr} -o {output[0]} {input[0]}
+        tabix -p vcf {output[0]}
+        '''
 
 rule bcftools_concat:
     input:
