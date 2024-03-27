@@ -79,7 +79,7 @@ rule bcftools_filter_beagle:
     output:
         multiext('{mapper}_DV/{region}.beagle4_filtered.vcf.gz','','.tbi')
     params:
-        filter_expr = lambda wildcards: f"-i 'DR2<0.7'{' -g ^het' if wildcards.region not in ('X','Y_HAPLOID') else None}"
+        filter_expr = lambda wildcards: f"-i 'DR2<0.7'{' -g ^het' if wildcards.region in ('X','Y_HAPLOID') else ''}"
     shell:
         '''
         bcftools view {params.filter_expr} -o {output[0]} {input[0]}
