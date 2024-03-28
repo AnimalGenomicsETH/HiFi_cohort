@@ -1,6 +1,5 @@
 from pathlib import PurePath
 
-
 rule bcftools_split:
     input:
         '{mapper}_DV/{chromosome}.beagle4.vcf.gz'
@@ -15,14 +14,35 @@ rule bcftools_split:
         bcftools +split -i 'GT[*]="alt"' -Oz -o {params._dir} {input}
         '''
 
+rule make_happy_regions:
+    input:
+        TRF = '/cluster/work/pausch/alex/Pop_HiFi/GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed',
+        RM = '/cluster/work/pausch/alex/Pop_HiFi/GCF_002263795.3.repeatMasker.out.gz'
+    output:
+        regions = 'happy/regions.tsv',
+        beds = expand('happy/{region}.bed',region=('VNTR','normal'))
+    localrule: True
+    shell:
+        '''
+        cat {input.TRF} > {output.beds[0]}
+        cat {output.beds[0]} |\
+        bedtools complement -g {config[reference]}.fai -i /dev/stdin > {output.beds[1]}
+
+        echo -e "VNTR\\thappy/VNTR.bed\\normal\\thappy/normal.bed" > {output.regions}
+
+        zgrep -P "(LTR|LINE|SINE)" {input.RM} | awk '$5~/NC/' | RM2Bed.py - - > {beds[2]}
+
+        '''
+
 rule happy:
     input:
         vcf1 = '{read1}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',
         vcf2 = '{read2}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',
-        reference = config['reference']
+        reference = config['reference'],
+        regions = 'happy/regions.tsv'
     output:
-        csv = 'happy_{read1}_{read2}/{sample}.{chromosome}.summary.csv',
-        others = multiext('happy_{read1}_{read2}/{sample}.{chromosome}','.bcf','.bcf.csi','.extended.csv','.roc.all.csv.gz','.runinfo.json')
+        csv = 'happy/{sample}.{chromosome}.{read1}_{read2}.summary.csv',
+        others = multiext('happy/{sample}.{chromosome}.{read1}_{read2}','.bcf','.bcf.csi','.extended.csv','.roc.all.csv.gz','.runinfo.json')
     params:
         _dir = lambda wildcards, output: PurePath(output.csv).with_suffix('').with_suffix('')
     container: '/cluster/work/pausch/alex/software/images/hap.py_latest.sif'
@@ -34,7 +54,7 @@ rule happy:
         storage_load = 1
     shell:
         '''
-        /opt/hap.py/bin/hap.py -r {input.reference} --bcf --usefiltered-truth --no-roc --no-json -L --pass-only --scratch-prefix $TMPDIR -X --threads {threads} -o {params._dir} {input.vcf1} {input.vcf2}
+        /opt/hap.py/bin/hap.py -r {input.reference} --bcf --usefiltered-truth --no-roc --no-json -L --pass-only --scratch-prefix $TMPDIR -X --threads {threads} --stratification {input.regions} -o {params._dir} {input.vcf1} {input.vcf2}
         '''
 
 rule gather_happy:
@@ -45,9 +65,9 @@ rule gather_happy:
     localrule: True
     shell:
         '''
-        echo -e "variant truth query recall precision truth_TiTv query_TiTv sample chromosome" > {output}
+        echo -e "variant region truth query recall precision truth_TiTv query_TiTv F1_score sample chromosome" > {output}
         for i in {input}
         do
-          awk -v I=$(basename $i) -F',' '$2=="PASS" {{ split(I,a,"."); print $1,$3,$6,$10,$11,$14,$15,a[1],a[2] }}' $i >> {output}
+          awk -v I=$(basename $i) -F',' '$2=="*"&&($3~/CDS/||$3=="NCE"||$3=="intergenic")&&$4=="PASS" {{ split(I,a,"."); print $1,$3,$17,$38,$8,$9,$22,$43,$11,a[1],a[2] }}' $i
         done
         '''
