@@ -5,14 +5,15 @@ HiFi_dataframe = pd.read_csv(config['sample_sheet'])
 samples = sorted(list(HiFi_dataframe['Sample'].unique()))
 
 regions = list(map(str,range(1,30))) + ['X','Y','MT','unplaced']
+main_regions = list(map(str,range(1,30))) + ['X','Y_PAR','Y_HAPLOID']
 
 include: 'snakepit/alignment.smk'
 include: 'snakepit/variant_calling.smk'
 include: 'snakepit/read_comparison.smk'
 include: 'snakepit/methylation.smk'
 
-workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
-
+#workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
+workflow._singularity_args =  '-B $TMPDIR -B /cluster/work/pausch/inputs'
 
 wildcard_constraints:
     sample = r'BSWCHEM\d+',

@@ -2,7 +2,7 @@ from pathlib import PurePath
 
 rule bcftools_split:
     input:
-        '{mapper}_DV/{chromosome}.beagle4.vcf.gz'
+        '{mapper}_DV/{chromosome}.beagle4_filtered.vcf.gz'
     output:
         expand('{mapper}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',sample=samples,allow_missing=True)
     params:
@@ -20,17 +20,23 @@ rule make_happy_regions:
         RM = '/cluster/work/pausch/alex/Pop_HiFi/GCF_002263795.3.repeatMasker.out.gz'
     output:
         regions = 'happy/regions.tsv',
-        beds = expand('happy/{region}.bed',region=('VNTR','normal'))
+        beds = expand('happy/{region}.bed',region=('VNTR','TE','normal'))
     localrule: True
     shell:
         '''
-        cat {input.TRF} > {output.beds[0]}
-        cat {output.beds[0]} |\
-        bedtools complement -g {config[reference]}.fai -i /dev/stdin > {output.beds[1]}
+        bedtools sort -faidx {config[reference]}.fai -i {input.TRF} > {output.beds[0]}
 
-        echo -e "VNTR\\thappy/VNTR.bed\\normal\\thappy/normal.bed" > {output.regions}
+        zgrep -P "(LTR|LINE|SINE)" {input.RM} |\
+        RM2Bed.py - - |\
+        bedtools sort -faidx {config[reference]}.fai -i - |\
+        bedtools subtract -a /dev/stdin -b {output.beds[0]} -A |\
+        cut -f -3 > {output.beds[1]}
 
-        zgrep -P "(LTR|LINE|SINE)" {input.RM} | awk '$5~/NC/' | RM2Bed.py - - > {beds[2]}
+        cat {output.beds[0]} {output.beds[1]} |\
+        bedtools sort -faidx {config[reference]}.fai -i - |\
+        bedtools complement -g {config[reference]}.fai -i /dev/stdin > {output.beds[2]}
+
+        echo -e "VNTR\\t{output.beds[0]}\\nTE\\t{output.beds[1]}\\nnormal\\t{output.beds[2]}" > {output.regions}
 
         '''
 
@@ -38,7 +44,7 @@ rule happy:
     input:
         vcf1 = '{read1}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',
         vcf2 = '{read2}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',
-        reference = config['reference'],
+        reference = config['reference_uncompressed'],
         regions = 'happy/regions.tsv'
     output:
         csv = 'happy/{sample}.{chromosome}.{read1}_{read2}.summary.csv',
@@ -59,7 +65,7 @@ rule happy:
 
 rule gather_happy:
     input:
-        expand(rules.happy.output[0],sample=samples,chromosome=regions[:-1],allow_missing=True)
+        expand(rules.happy.output[0],sample=samples,chromosome=main_regions,allow_missing=True)
     output:
         'happy/{read1}_{read2}.F1.csv'
     localrule: True
