@@ -1,9 +1,3 @@
-
-rule all:
-    input:
-        'coverage/regions.csv.gz'
-
-
 rule bedtool_makewindows:
     input:
         fai = config['reference']+".fai"
@@ -17,13 +11,13 @@ rule bedtool_makewindows:
 
 rule samtools_bedcov:
     input:
-        bam = lambda wildcards: 'alignments/{sample}.mm2.bam' if wildcards.mapper=='mm2' else 'alignments_old/{sample}.bwa.cram',
+        bam = lambda wildcards: f'/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/BTA/bams_UCD2.0_eQTL_{"HiFi" if wildcards.mapper=="mm2" else "SR"}/{wildcards.sample}.{wildcards.mapper}.cram', 
         windows = expand(rules.bedtool_makewindows.output,window=100000),
         reference = config['reference']
     output:
         'coverage/{sample}.{mapper}.{filtering,default|secondary|quality}.csv'
     params:
-        flags = lambda wildcards: {'default':'0','secondary':'256','quality':'0 -Q 10'}[wildcards.filtering]
+        flags = lambda wildcards: {'default':'0','secondary':'256','quality':'0 -Q 5'}[wildcards.filtering]
     threads: 1
     resources:
         mem_mb = 15000
@@ -36,21 +30,24 @@ rule samtools_bedcov:
 rule bedtools_coverage:
     input:
         windows = expand(rules.bedtool_makewindows.output,window=100000),
-        vcfs = '{mapper}_DV/all.beagle4.vcf.gz'#,region=(list(map(str,range(1,30))) + ['X','Y','MT']),allow_missing=True)
+        vcfs = expand('{mapper}_DV/{region}.{filtering}.vcf.gz',region=main_regions,allow_missing=True)
     output:
-        'coverage/{sample}.{mapper}.variants.csv'
+        'coverage/{sample}.{mapper}.{filtering}.csv'
     resources:
         mem_mb = 15000
     shell:
         '''
-        bedtools coverage -a {input.windows} -b <(bcftools query -f '%CHROM %POS\\n' {input.vcfs} | awk -v OFS='\\t' '{{print $1,$2,$2+1}}') |\
-        awk '{{print "{wildcards.sample}","{wildcards.mapper}","variants",$1,$2,$4/($3-$2),$7}}' > {output}
+        bcftools concat --naive-force {input.vcfs} |\
+        bcftools query -f '%CHROM %POS\\n' |\
+        awk -v OFS='\\t' '{{print $1,$2,$2+1}}' |\
+        bedtools coverage -a {input.windows} -b /dev/stdin |\
+        awk '{{print "{wildcards.sample}","{wildcards.mapper}","{wildcards.filtering}",$1,$2,$4/($3-$2),$7}}' > {output}
         '''
 
 rule gather_samples:
     input:
         expand(rules.samtools_bedcov.output,sample=config['samples'],mapper=('mm2','bwa'),filtering=('default','secondary','quality')),
-         expand(rules.bedtools_coverage.output,sample=config['samples'],mapper=('mm2','bwa'))
+         expand(rules.bedtools_coverage.output,sample=config['samples'],mapper=('mm2','bwa'),filtering=('filtered','beagle4_filtered'))
     output:
         'coverage/regions.csv.gz'
     localrule: True
