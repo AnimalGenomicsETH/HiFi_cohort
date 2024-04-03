@@ -65,7 +65,7 @@ rule happy:
 
 rule gather_happy:
     input:
-        expand(rules.happy.output[0],sample=samples,chromosome=main_regions,allow_missing=True)
+        expand(rules.happy.output['others'][2],sample=samples,chromosome=main_regions,allow_missing=True)
     output:
         'happy/{read1}_{read2}.F1.csv'
     localrule: True
@@ -74,6 +74,6 @@ rule gather_happy:
         echo -e "variant region truth query recall precision truth_TiTv query_TiTv F1_score sample chromosome" > {output}
         for i in {input}
         do
-          awk -v I=$(basename $i) -F',' '$2=="*"&&($3~/CDS/||$3=="NCE"||$3=="intergenic")&&$4=="PASS" {{ split(I,a,"."); print $1,$3,$17,$38,$8,$9,$22,$43,$11,a[1],a[2] }}' $i
+          awk -v I=$(basename $i) -F',' '$2=="*"&&$4=="PASS" {{ split(I,a,"."); print $1,$3,$17,$38,$8,$9,$22,$43,$11,a[1],a[2] }}' $i >> {output}
         done
         '''
