@@ -17,14 +17,25 @@ rule samtools_bedcov:
     output:
         'coverage/{sample}.{mapper}.{filtering,default|secondary|quality}.csv'
     params:
-        flags = lambda wildcards: {'default':'0','secondary':'256','quality':'0 -Q 5'}[wildcards.filtering]
+        flags = lambda wildcards: {'default':'','secondary':'-g 256','quality':'-d 2 -Q 5'}[wildcards.filtering]
     threads: 1
     resources:
         mem_mb = 15000
     shell:
         '''
-        samtools bedcov -c -g {params.flags} --reference {input.reference} {input.windows} {input.bam} |\
+        samtools bedcov -c {params.flags} --reference {input.reference} {input.windows} {input.bam} |\
         awk '{{print "{wildcards.sample}","{wildcards.mapper}","{wildcards.filtering}",$1,$2,$4/($3-$2),$5}}' > {output}
+        '''
+
+rule samtools_coverage:
+    input:
+        cram = lambda wildcards: f'/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/BTA/bams_UCD2.0_eQTL_{"HiFi" if wildcards.mapper=="mm2" else "SR"}/{wildcards.sample}.{wildcards.mapper}.cram',
+        reference = config['reference']
+    output:
+        'coverage/{sample}.{mapper}.coverage.csv'
+    shell:
+        '''
+        samtools coverage --reference {input.reference} {input.cram}
         '''
 
 rule bedtools_coverage:
