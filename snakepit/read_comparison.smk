@@ -2,9 +2,9 @@ from pathlib import PurePath
 
 rule bcftools_split:
     input:
-        '{mapper}_DV/{chromosome}.beagle4_filtered.vcf.gz'
+        '{mapper}_DV/{chromosome}.{filtering}.vcf.gz'
     output:
-        expand('{mapper}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',sample=samples,allow_missing=True)
+        expand('{mapper}_DV/PER_SAMPLE_{chromosome}_{filtering}/{sample}.vcf.gz',sample=samples,allow_missing=True)
     params:
         _dir = lambda wildcards, output: PurePath(output[0]).parent
     resources:
@@ -42,13 +42,13 @@ rule make_happy_regions:
 
 rule happy:
     input:
-        vcf1 = '{read1}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',
-        vcf2 = '{read2}_DV/PER_SAMPLE_{chromosome}/{sample}.vcf.gz',
+        vcf1 = '{read1}_DV/PER_SAMPLE_{chromosome}_{filtering}/{sample}.vcf.gz',
+        vcf2 = '{read2}_DV/PER_SAMPLE_{chromosome}_{filtering}/{sample}.vcf.gz',
         reference = config['reference_uncompressed'],
         regions = 'happy/regions.tsv'
     output:
-        csv = 'happy/{sample}.{chromosome}.{read1}_{read2}.summary.csv',
-        others = multiext('happy/{sample}.{chromosome}.{read1}_{read2}','.bcf','.bcf.csi','.extended.csv','.roc.all.csv.gz','.runinfo.json')
+        csv = 'happy/{sample}.{chromosome}.{filtering}.{read1}_{read2}.summary.csv',
+        others = multiext('happy/{sample}.{chromosome}.{filtering}.{read1}_{read2}','.bcf','.bcf.csi','.extended.csv','.roc.all.csv.gz','.runinfo.json')
     params:
         _dir = lambda wildcards, output: PurePath(output.csv).with_suffix('').with_suffix('')
     container: '/cluster/work/pausch/alex/software/images/hap.py_latest.sif'
@@ -67,7 +67,7 @@ rule gather_happy:
     input:
         expand(rules.happy.output['others'][2],sample=samples,chromosome=main_regions,allow_missing=True)
     output:
-        'happy/{read1}_{read2}.F1.csv'
+        'happy/{read1}_{read2}.{filtering}.F1.csv'
     localrule: True
     shell:
         '''
