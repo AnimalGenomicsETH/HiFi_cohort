@@ -4,7 +4,7 @@ wildcard_constraints:
     _pass = r'permutations|conditionals|nominals',
     tissue = r'Testis',
     chunk = r'\d+',
-    chrom = r'\d+',
+    chromosome = r'\d+|X|Y',
     MAF = r'\d+',
     vcf = r'(eQTL|gwas)/\S+'
 
@@ -52,7 +52,7 @@ rule qtltools_parallel:
         cov = lambda wildcards: config['covariates'][wildcards.QTL][wildcards.tissue],
         mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else []
     output:
-        merged = temp('QTL/{QTL}/{tissue}_{variants}/{_pass}.{chunk}.{MAF}.txt.gz')
+        merged = 'QTL/{QTL}/{tissue}_{variants}/{_pass}.{chromosome}.{MAF}.txt.gz'
     params:
         _pass = lambda wildcards,input: get_pass(wildcards._pass,input),
         grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else ''
@@ -61,27 +61,14 @@ rule qtltools_parallel:
         mem_mb = 2500,
     shell:
         '''
-        QTLtools cis --vcf {input.vcf} --exclude-sites {input.exclude} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --normal --chunk {wildcards.chunk} {config[chunks]} --silent --log /dev/stderr --out /dev/stdout | pigz -p 2 -c > {output}
-        '''
-
-rule qtltools_gather:
-    input:
-        expand(rules.qtltools_parallel.output,chunk=range(0,config['chunks']+1),allow_missing=True)
-    output:
-        'QTL/{QTL}/{tissue}_{variants}/{_pass}.{MAF}.txt.gz'
-    params:
-        sort_key = lambda wildcards: '-k9,9Vr -k10,10n' if wildcards.QTL == 'eQTL' else '-k11,11Vr -k12,12n'
-    localrule: True
-    shell:
-        '''
-        LC_ALL=C; pigz -p 2 -dc {input} | sort --parallel=2 {params.sort_key} | pigz -p 2 -c > {output}
+        QTLtools cis --vcf {input.vcf} --exclude-sites {input.exclude} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --normal --silent --log /dev/stderr --out /dev/stdout | pigz -p 2 -c > {output}
         '''
 
 rule qtltools_FDR:
     input:
-        expand(rules.qtltools_gather.output,_pass='permutations',allow_missing=True)
+        expand(rules.qtltools_parallel.output,_pass='permutations',allow_missing=True)
     output:
-        'QTL/{QTL}/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt'
+        'QTL/{QTL}/{tissue}_{variants}/permutations_all.{chromosome}.{MAF}.thresholds.txt'
     params:
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
     envmodules:
