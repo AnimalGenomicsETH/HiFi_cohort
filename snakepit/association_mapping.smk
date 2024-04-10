@@ -3,16 +3,21 @@ from pathlib import PurePath
 wildcard_constraints:
     _pass = r'permutations|conditionals|nominals',
     tissue = r'Testis',
-    chunk = r'\d+',
     chromosome = r'\d+|X|Y',
     MAF = r'\d+',
     vcf = r'(eQTL|gwas)/\S+'
 
+regions = list(map(str,range(1,30))) + ['X','Y']
+
+rule all:
+    input:
+        expand('QTL/eQTL/Testis_{variants}/{_pass}.{chromosome}.{MAF}.txt.gz',_pass=('nominals','conditionals'),chromosome=regions,variants=config['variants'],MAF=config['MAF'])
+
 rule normalise_vcf:
     input:
-        lambda wildcards: config['variants'][wildcards.variants]
+        lambda wildcards: expand(config['variants'][wildcards.variants],**wildcards,allow_missing=True)
     output:
-        'QTL/{variants}.vcf.gz'
+        'QTL/variants/{variants}.{chromosome}.vcf.gz'
     threads: 4
     resources:
         mem_mb = 2500,
@@ -27,9 +32,9 @@ rule normalise_vcf:
 
 rule exclude_MAF:
     input:
-        lambda wildcards: config['variants'][wildcards.variants]
+        lambda wildcards: expand(config['variants'][wildcards.variants],**wildcards,allow_missing=True)
     output:
-        'QTL/{variants}.exclude_sites.{MAF}.txt'
+        'QTL/variants/{variants}.exclude_sites.{chromosome}.{MAF}.txt'
     shell:
         '''
         bcftools view --threads 2 -Q 0.{wildcards.MAF}:minor -Ou {input} |\
@@ -42,15 +47,15 @@ def get_pass(_pass,input):
     elif _pass == 'conditionals':
         return f'--mapping {input.mapping}'
     elif _pass == 'nominals':
-        return f'--nominal {config.get("nominal",0.05)}'
+        return f'--nominal {config.get("nominal_threshold",0.05)}'
 
 rule qtltools_parallel:
     input:
-        vcf = lambda wildcards: config['variants'][wildcards.variants],
+        vcf = lambda wildcards: expand(config['variants'][wildcards.variants],**wildcards,allow_missing=True),
         exclude = rules.exclude_MAF.output,
-        bed = lambda wildcards: config['mol_QTLs'][wildcards.QTL][wildcards.tissue],
-        cov = lambda wildcards: config['covariates'][wildcards.QTL][wildcards.tissue],
-        mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}/permutations_all.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else []
+        bed = lambda wildcards: expand(config['mol_QTLs'][wildcards.QTL][wildcards.tissue],**wildcards,allow_missing=True),
+        cov = lambda wildcards: expand(config['covariates'][wildcards.QTL][wildcards.tissue],**wildcards,allow_missing=True),
+        mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}/permutations_all.{chromosome}.{MAF}.thresholds.txt' if wildcards._pass == 'conditionals' else []
     output:
         merged = 'QTL/{QTL}/{tissue}_{variants}/{_pass}.{chromosome}.{MAF}.txt.gz'
     params:
@@ -71,9 +76,7 @@ rule qtltools_FDR:
         'QTL/{QTL}/{tissue}_{variants}/permutations_all.{chromosome}.{MAF}.thresholds.txt'
     params:
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
-    envmodules:
-        'gcc/8.2.0',
-        'r/4.2.2'
+    conda: 'R'
     shell:
         '''
         Rscript /cluster/work/pausch/alex/software/qtltools/scripts/qtltools_runFDR_cis.R {input} 0.05 {params.out}
