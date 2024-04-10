@@ -1,8 +1,15 @@
 
 ## QTL settings
+
+FDR_script: '/cluster/work/pausch/alex/software/qtltools/scripts/qtltools_runFDR_cis.R'
+
 MAF: #defined as "0.{MAF}"
   - "01" #this is 1%
-  #- "001" #this is 0.1%
+  - "001" #this is 0.1%
+
+FDR: # same as above
+  - "05" # default 5% FDR
+  - "0001" # very strict FDR
 
 permutations: 100
 window: 100000 # 1 Mb
