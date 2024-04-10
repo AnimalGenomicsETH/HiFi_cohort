@@ -1,0 +1,31 @@
+
+## QTL settings
+MAF: #defined as "0.{MAF}"
+  - "01" #this is 1%
+  #- "001" #this is 0.1%
+
+permutations: 100
+window: 100000 # 1 Mb
+nominal_threshold: 1 # keep all associations
+
+## molecular phenotypes and covaraites
+
+mol_QTLs:
+  eQTL:
+    Testis: '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/phenotypes/{chromosome}_gene_counts.gz'
+covariates:
+  eQTL:
+    Testis: '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/covariates/RNA_cov_testis.txt'
+  #sQTL:
+  #  Testis: '/cluster/work/pausch/xena/eQTL/sQTL/testis/removed/QTLtools/sQTL_covariates_removed_testis.txt'
+
+
+## variant calls
+
+## reference is needed for normalisation of indels, does not matter if masked or not
+reference: '/cluster/work/pausch/inputs/ref/BTA/UCD2.0/GCA_002263795.4_ARS-UCD2.0_genomic.fa'
+
+variants: 
+  imputed: '/cluster/work/pausch/HiFi_QTL/variants/HiFi/merged/imputed/{chromosome}.vcf.gz'
+  filtered: '/cluster/work/pausch/HiFi_QTL/variants/HiFi/merged/filtered/{chromosome}.vcf.gz'
+
