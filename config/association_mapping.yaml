@@ -22,7 +22,9 @@ mol_QTLs:
     Testis: '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/phenotypes/{chromosome}_gene_counts.gz'
 covariates:
   eQTL:
-    Testis: '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/covariates/RNA_cov_testis.txt'
+    Testis:
+      threshold_09: '/cluster/work/pausch/HiFi_QTL/fake_cov.txt'
+#'/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/covariates/RNA_cov_testis.txt'
   #sQTL:
   #  Testis: '/cluster/work/pausch/xena/eQTL/sQTL/testis/removed/QTLtools/sQTL_covariates_removed_testis.txt'
 

@@ -3,6 +3,7 @@ from pathlib import PurePath
 wildcard_constraints:
     _pass = r'permutations|conditionals|nominals',
     tissue = r'Testis',
+    variants = r'imputed|filtered',
     chromosome = r'\d+|X|Y',
     MAF = r'\d+',
     vcf = r'(eQTL|gwas)/\S+'
@@ -11,8 +12,8 @@ regions = list(map(str,range(1,30))) + ['X','Y']
 
 rule all:
     input:
-        expand('QTL/eQTL/Testis_{variants}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz',_pass=('nominals',),chromosome=regions,variants=config['variants'],MAF=config['MAF'],FDR=('None',)),
-        expand('QTL/eQTL/Testis_{variants}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz',_pass=('conditionals',),chromosome=regions,variants=config['variants'],MAF=config['MAF'],FDR=config['FDR'])
+        expand('QTL/eQTL/Testis_{variants}_{covariates}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz',_pass=('nominals',),chromosome=regions,variants=config['variants'],MAF=config['MAF'],FDR=('None',),covariates=config['covariates']['eQTL']['Testis']),
+        expand('QTL/eQTL/Testis_{variants}_{covariates}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz',_pass=('conditionals',),chromosome=regions,variants=config['variants'],MAF=config['MAF'],FDR=config['FDR'],covariates=config['covariates']['eQTL']['Testis'])
 
 rule normalise_vcf:
     input:
@@ -55,10 +56,10 @@ rule qtltools_parallel:
         vcf = rules.normalise_vcf.output,
         exclude = rules.exclude_MAF.output,
         bed = lambda wildcards: expand(config['mol_QTLs'][wildcards.QTL][wildcards.tissue],**wildcards,allow_missing=True),
-        cov = lambda wildcards: expand(config['covariates'][wildcards.QTL][wildcards.tissue],**wildcards,allow_missing=True),
-        mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}/permutations_all.{chromosome}.{MAF}.{FDR}.thresholds.txt' if wildcards._pass == 'conditionals' else []
+        cov = lambda wildcards: expand(config['covariates'][wildcards.QTL][wildcards.tissue][wildcards.covariates],**wildcards,allow_missing=True),
+        mapping = lambda wildcards: 'QTL/{QTL}/{tissue}_{variants}_{covariates}/permutations_all.{chromosome}.{MAF}.{FDR}.thresholds.txt' if wildcards._pass == 'conditionals' else []
     output:
-        merged = 'QTL/{QTL}/{tissue}_{variants}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz'
+        merged = 'QTL/{QTL}/{tissue}_{variants}_{covariates}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz'
     params:
         _pass = lambda wildcards,input: get_pass(wildcards._pass,input),
         grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else ''
@@ -74,7 +75,7 @@ rule qtltools_FDR:
     input:
         expand(rules.qtltools_parallel.output,_pass='permutations',FDR='None',allow_missing=True)
     output:
-        'QTL/{QTL}/{tissue}_{variants}/permutations_all.{chromosome}.{MAF}.{FDR}.thresholds.txt'
+        'QTL/{QTL}/{tissue}_{variants}_{covariates}/permutations_all.{chromosome}.{MAF}.{FDR}.thresholds.txt'
     params:
         out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
     #conda: 'R'
