@@ -32,6 +32,21 @@ rule normalise_vcf:
         tabix -fp vcf {output[0]}
         '''
 
+rule bcftools_set_id_for_plink:
+    input:
+        rules.normalise_vcf.output
+    output:
+         vcf = multiext('QTL/variants/{variants}.{chromosome}.hexID.vcf.gz','','.tbi'),
+         ID_map = 'QTL/variants/{variants}.{chromosome}.ID_map.txt'
+    threads: 2
+    resources:
+        mem_mb = 1500
+    shell:
+        '''
+        bcftools annotate --threads {threads} --set-id '%VKX' -o {output.vcf[0]} {input[0]}
+        paste <(bcftools query -f '%ID' {input[0]}) <(bcftools query -f '%ID' {output.vcf[0]}) > {output.ID_map}
+        '''
+
 rule exclude_MAF:
     input:
         rules.normalise_vcf.output
