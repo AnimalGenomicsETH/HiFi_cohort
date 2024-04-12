@@ -17,7 +17,7 @@ rule samtools_bedcov:
     output:
         'coverage/{sample}.{mapper}.{filtering,default|secondary|quality}.csv'
     params:
-        flags = lambda wildcards: {'default':'','secondary':'-g 256','quality':'-d 2 -Q 5'}[wildcards.filtering]
+        flags = lambda wildcards: {'default':'','secondary':'-g 256','quality':'-d 2 -Q 5 -G 2048'}[wildcards.filtering]
     threads: 1
     resources:
         mem_mb = 15000
