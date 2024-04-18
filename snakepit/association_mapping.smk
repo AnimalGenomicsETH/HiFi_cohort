@@ -4,7 +4,7 @@ wildcard_constraints:
     _pass = r'permutations|conditionals|nominals',
     tissue = r'Testis',
     variants = r'imputed|filtered',
-    chromosome = r'\d+|X|Y',
+    chromosome = r'\d+|X|Y\w*',
     MAF = r'\d+',
     vcf = r'(eQTL|gwas)/\S+'
 
@@ -83,6 +83,7 @@ rule qtltools_parallel:
         mem_mb = 2500,
     shell:
         '''
+
         QTLtools cis --vcf {input.vcf[0]} --exclude-sites {input.exclude} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --silent --log /dev/stderr --out /dev/stdout | pigz -p 2 -c > {output}
         '''
 
