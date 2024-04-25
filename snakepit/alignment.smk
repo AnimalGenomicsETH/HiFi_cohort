@@ -17,6 +17,25 @@ rule minimap2_align:
         samtools sort - -m 3000M -@ {threads} -T $TMPDIR -o {output[0]} --write-index
         '''
 
+rule winnowmap_align:
+    input:
+        uBAM = 'alignments/uBAM/{sample}/{cell}.5mC.bam',
+        reference = config['reference'],
+        repetitive_kmers = 'repetitive_k15.txt'
+    output:
+        temp(multiext('alignments/wm2/{sample}/{cell}.5mC.bam','','.csi'))
+    threads: lambda wildcards: 24 if wildcards.cell[:2] == 'm8' else 16
+    resources:
+        mem_mb = 5000,
+        walltime = '24h',
+        scratch = '50G'
+    shell:
+        '''
+        samtools fastq -T rq,MM,ML --threads {threads} {input.uBAM} |\
+        winnowmap -t {threads} -ax map-pb -R '@RG\\tPL:PacBio\\tID:{wildcards.cell}\\tSM:{wildcards.sample}' -y -Y {input.reference} - |\
+        samtools sort - -m 3000M -@ {threads} -T $TMPDIR -o {output[0]} --write-index
+        '''
+
 rule pbmm2_align:
     input:
         uBAM = lambda wildcards: rules.fibertools_predict_m6a.output[0] if wildcards.methylation == 'm6a' else 'alignments/uBAM/{sample}/{cell}.5mC.bam',
@@ -46,10 +65,12 @@ def gather_cells(sample):
 
 rule samtools_merge:
     input:
-        bam = lambda wildcards: expand(rules.minimap2_align.output[0],zip,**gather_cells(wildcards.sample),allow_missing=True) if wildcards.mapper == 'mm2' else expand(rules.pbmm2_align.output[0],zip,**gather_cells(wildcards.sample),allow_missing=True),
-        csi = lambda wildcards: expand(rules.minimap2_align.output[1],zip,**gather_cells(wildcards.sample),allow_missing=True) if wildcards.mapper == 'mm2' else expand(rules.pbmm2_align.output[1],zip,**gather_cells(wildcards.sample),allow_missing=True)
+        bam = lambda wildcards: expand('alignments/{mapper}/{sample}/{cell}.{methylation}.bam',zip,**gather_cells(wildcards.sample),allow_missing=True),
+        csi = lambda wildcards: expand('alignments/{mapper}/{sample}/{cell}.{methylation}.bam.csi',zip,**gather_cells(wildcards.sample),allow_missing=True),
+        #bam = lambda wildcards: expand(rules.minimap2_align.output[0],zip,**gather_cells(wildcards.sample),allow_missing=True) if wildcards.mapper == 'mm2' else expand(rules.pbmm2_align.output[0],zip,**gather_cells(wildcards.sample),allow_missing=True),
+        #csi = lambda wildcards: expand(rules.minimap2_align.output[1],zip,**gather_cells(wildcards.sample),allow_missing=True) if wildcards.mapper == 'mm2' else expand(rules.pbmm2_align.output[1],zip,**gather_cells(wildcards.sample),allow_missing=True)
     output:
-        multiext('alignments/{sample}.{mapper,mm2|pbmm2}.bam','','.csi')
+        multiext('alignments/{sample}.{mapper,mm2|pbmm2|wm2}.bam','','.csi')
     threads: 6
     resources:
         mem_mb = 5000
