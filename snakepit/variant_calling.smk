@@ -208,7 +208,7 @@ rule bcftools_merge_sniffles:
 
 rule bcftools_filter:
     input:
-        rules.sniffles_merge.output
+        rules.bcftools_merge_sniffles.output
     output:
         multiext('{mapper}_SVs/filtered/{region}.vcf.gz','','.csi')
     params:
@@ -259,25 +259,23 @@ rule bcftools_concat_QTL:
         tabix -p vcf {output[0]}
         '''
 
-checkpoint split_SV_sequences:
+rule split_SV_sequences:
     input:
-        '{mapper}_SVs/InDels_clean_chromosomes.sniffles.vcf.gz'
-        #rules.bcftools_concat_QTL.output
+        '/cluster/work/pausch/HiFi_QTL/variants/HiFi/sniffles2/{region}.vcf.gz'
     output:
-        directory('{mapper}_SVs/SV_sequences')
+        'mm2_SVs/SV_sequences/{region}.fa'
     shell:
         '''
-        mkdir -p {output}
-        #-i 'abs(ILEN)>=50'
-        bcftools query -f '%ID\\t%REF\\t%ALT\\n' {input[0]} | awk 'length($2)>length($3) {{print ">"$1"\\n"$2;next}} {{print ">"$1"\\n"$3}}' |\
-        split -l 10000 -d -a 4 --additional-suffix ".fa" - {output}/
+        bcftools query -f '%ID\\t%REF\\t%ALT\\n' {input[0]} |\
+        awk 'length($2)>length($3) {{print ">"$1"\\n"$2;next}} {{print ">"$1"\\n"$3}}' \
+        > {output}
         '''
 
 rule repeat_masker:
     input:
-        '{mapper}_SVs/SV_sequences/{chunk}.fa',
+        rules.split_SV_sequences.output
     output:
-        '{mapper}_SVs/SV_sequences/{chunk}.fa.out'
+        '{mapper}_SVs/SV_sequences/{region}.fa.out'
     threads: 2
     resources:
         mem_mb = 1500,
@@ -292,26 +290,18 @@ rule repeat_masker:
 
 rule TRF:
     input:
-        '{mapper}_SVs/SV_sequences/{chunk}.fa'
+        rules.split_SV_sequences.output
     output:
-        '{mapper}_SVs/SV_sequences/{chunk}.fa.trf'
+        '{mapper}_SVs/SV_sequences/{region}.fa.trf'
     shell:
         '''
         TRF {input} 2 5 7 80 10 50 2000 -h -ngs > {output}
         '''
 
-def aggregate_out_chunks(wildcards):
-    checkpoint_output = checkpoints.split_SV_sequences.get(**wildcards).output[0]
-    return expand('{fpath}/{chunk}.fa.out',fpath=checkpoint_output,chunk=glob_wildcards(PurePath(checkpoint_output).joinpath('{chunk}.fa')).chunk)
-
-def aggregate_trf_chunks(wildcards):
-    checkpoint_output = checkpoints.split_SV_sequences.get(**wildcards).output[0]
-    return expand('{fpath}/{chunk}.fa.trf',fpath=checkpoint_output,chunk=glob_wildcards(PurePath(checkpoint_output).joinpath('{chunk}.fa')).chunk)
-
 rule merge_masked_chromosomes:
     input:
-        out = aggregate_out_chunks,
-        trf = aggregate_trf_chunks
+        out = expand(rules.repeat_masker.output,region=regions[:-2],allow_missing=True),
+        trf = expand(rules.TRF.output,region=regions[:-2],allow_missing=True),
     output:
         out = '{mapper}_SVs/SV_sequences.out.gz',
         trf = '{mapper}_SVs/SV_sequences.trf.gz'
