@@ -11,13 +11,13 @@ rule bedtool_makewindows:
 
 rule samtools_bedcov:
     input:
-        bam = lambda wildcards: f'/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/BTA/bams_UCD2.0_eQTL_{"HiFi" if wildcards.mapper=="mm2" else "SR"}/{wildcards.sample}.{wildcards.mapper}.cram', 
+        bam = rules.samtools_merge.output[0], #lambda wildcards: f'/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/BTA/bams_UCD2.0_eQTL_{"HiFi" if wildcards.mapper=="mm2" else "SR"}/{wildcards.sample}.{wildcards.mapper}.cram',
         windows = expand(rules.bedtool_makewindows.output,window=100000),
         reference = config['reference']
     output:
         'coverage/{sample}.{mapper}.{filtering,default|secondary|quality}.csv'
     params:
-        flags = lambda wildcards: {'default':'','secondary':'-g 256','quality':'-d 2 -Q 5 -G 2048'}[wildcards.filtering]
+        flags = lambda wildcards: {'default':'','secondary':'-g 256','quality':'-d 2 -Q 5','quality_sup':'-d 2 -Q 5 -G 2048'}[wildcards.filtering]
     threads: 1
     resources:
         mem_mb = 15000
@@ -43,7 +43,7 @@ rule bedtools_coverage:
         windows = expand(rules.bedtool_makewindows.output,window=100000),
         vcfs = expand('{mapper}_DV/{region}.{filtering}.vcf.gz',region=main_regions,allow_missing=True)
     output:
-        'coverage/{sample}.{mapper}.{filtering}.csv'
+        'coverage/{sample}.{mapper}.{filtering,filtered|beagle4-filtered}.csv'
     resources:
         mem_mb = 15000
     shell:

@@ -19,7 +19,7 @@ workflow._singularity_args =  '-B $TMPDIR -B /cluster/work/pausch/inputs'
 wildcard_constraints:
     sample = r'BSWCHEM\d+',
     regions = r'|'.join(regions) + r'|Y_PAR|Y_HAPLOID',
-    mapper = r'bwa|strobe|mm2|pbmm2'
+    mapper = r'bwa|strobe|mm2|pbmm2|wm2'
 
 rule all:
     input:
