@@ -1,0 +1,1 @@
+{ echo -e "sample\tbefore\tin\tafter" ; for i in *cram; do echo -ne "${i%.bwa.cram}\t"; samtools bedcov --reference /cluster/work/pausch/inputs/ref/BTA/UCD2.0/GCA_002263795.4_ARS-UCD2.0_genomic.fa  <(echo -e "8\t102486033\t103486033\n8\t103486033\t103571583\n8\t103571583\t104571583") $i | awk '{print $4/($3-$2)}' |tr '\n' '\t'; echo ; done ; }
