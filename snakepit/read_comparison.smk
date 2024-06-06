@@ -74,6 +74,6 @@ rule gather_happy:
         echo -e "variant region truth query recall precision truth_TiTv query_TiTv F1_score sample chromosome" > {output}
         for i in {input}
         do
-          awk -v I=$(basename $i) -F',' '$2=="*"&&$4=="PASS" {{ split(I,a,"."); print $1,$3,$17,$38,$8,$9,$22,$43,$11,a[1],a[2] }}' $i >> {output}
+          awk -v I=$(basename $i) -F',' '$4=="PASS" {{ split(I,a,"."); print $1,$3,$17,$38,$8,$9,$22,$43,$11,a[1],a[2] }}' $i >> {output}
         done
         '''
