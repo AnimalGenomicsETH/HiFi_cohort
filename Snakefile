@@ -12,6 +12,7 @@ include: 'snakepit/variant_calling.smk'
 include: 'snakepit/read_comparison.smk'
 include: 'snakepit/methylation.smk'
 include: 'snakepit/coverage.smk'
+include: 'snakepit/eVariant_F1_overlap.smk'
 
 #workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
 workflow._singularity_args =  '-B $TMPDIR -B /cluster/work/pausch/inputs'
