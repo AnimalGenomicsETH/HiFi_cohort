@@ -42,6 +42,6 @@ rule summarise_tags:
     shell:
         '''
         echo "ID N_tags N_SV_tags Span_kb" > {output}
-        awk '$1!="SNP"&&$4>0 {{print $1,$4,gsub("Sniffles","",$8),$7}}' {input} >> {output}
+        awk '$1!="SNP" {{print $1,$4,gsub("Sniffles","",$8),$7}}' {input} >> {output}
         '''
 
