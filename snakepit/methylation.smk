@@ -1,21 +1,8 @@
-rule fibertools_predict_m6a:
-    input:
-        'alignments/uBAM/{sample}/{cell}.5mC.bam'
-        #raw PacBio ubam with kinetics
-    output:
-        'alignments/uBAM/{sample}/{cell}.m6a.bam' #new ubam with methylation but without kinetics
-    threads: 16
-    resources:
-        mem_mb = 1500,
-        walltime = '24h'
-    shell:
-        '''
-        ft m6a -t {threads} {input} {output}
-        '''
+from pathlib import PurePath
 
 rule pb_CpG_tools:
     input:
-        bam = rules.samtools_merge_phased.output
+        bam = multiext('phasing/{sample}.mm2.phased.cram','','.cram')
     output:
         bed = "methylation/{sample}.{mapper}.combined.bed",
         BigWig = "methylation/{sample}.{mapper}.combined.bw"
@@ -64,13 +51,16 @@ rule methbat_profile:
         methbat profile --input-prefix {params.prefix} --input-regions {input.CpGs} --output-region-profile {output.profile} --output-asm-bed {output.ASM}
         '''
 
+
+samples_M = [l.strip() for l in open('config/Braunvieh_testis_subset.txt')]
+
 rule methbat_build:
     input:
-        collection = expand(rules.methbat_profile.output['profile'],sample=samples)
+        collection = expand(rules.methbat_profile.output['profile'],sample=samples_M)
     output:
         profile = 'methylation/cohort.BAT'
     params:
-        collection = lambda wildcards, input: 'identifier\\tfilename\\tlabels\\n'+'\\n'.join(f'{S}\\t{P}\\tMALE' for S,P in zip(samples,input.collection))
+        collection = lambda wildcards, input: 'identifier\\tfilename\\tlabels\\n'+'\\n'.join(f'{S}\\t{P}\\tMALE' for S,P in zip(samples_M,input.collection))
     resources:
         mem_mb = 15000
     shell:
@@ -101,7 +91,7 @@ rule methbat_compare:
 
 rule methbat_gather:
     input:
-        expand(rules.methbat_compare.output,sample=samples)
+        expand(rules.methbat_compare.output,sample=samples_M)
     output:
         'methylation/cohort.profiles'
     localrule: True
