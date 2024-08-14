@@ -77,3 +77,42 @@ rule gather_happy:
           awk -v I=$(basename $i) -F',' '$4=="PASS" {{ split(I,a,"."); print $1,$3,$17,$38,$8,$9,$22,$43,$11,a[1],a[2] }}' $i >> {output}
         done
         '''
+
+rule SV_comparison:
+    input:
+        panel = 'PanGenie_comparison/pangenome_panel.SVs.vcf',
+        direct = 'PanGenie_comparison/HiFi_cohort.SVs.vcf'
+    output:
+        vcf = 'PanGenie_comparison/overlap.vcf',
+        isec = 'PanGenie_comparison/overlap.isec'
+    conda: 'jasmine'
+    threads: 1
+    resources:
+        mem_mb = 5000,
+        walltime = '60m'
+    shell:
+        '''
+        jasmine --comma_filelist file_list={input.direct},{input.panel} threads={threads} out_file=/dev/stdout out_dir=$TMPDIR --keep_var_ids \
+        genome_file={config[reference]} --pre_normalize --ignore_strand --ignore_type \
+        max_dist_linear=0.5 max_dist=250 |\
+        tee {output.vcf} |\
+        grep -hoP "SUPP_VEC=\K\d+" |\
+        awk ' {{ A[$1]+=1 }} END {{ print A["01"],A["10"],A["11"] }}' > {output.isec}
+        '''
+
+rule find_disagreement_sites:
+    input:
+        expand(rules.happy.output['others'][0],sample=samples,chromosome=(1,),read1='mm2',read2='bwa',filtering='filtered')
+    output:
+        sites = 'Illumina_HiFi_comparison/disconcordant.sites'
+    threads: 6
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+
+        bcf_printer() {{ bcftools view -m 2 -M 2 -v snps -e 'FORMAT/BD=="TP"' $1 | bcftools query -f '%CHROM %POS %INFO/Regions [%BVT ]' ; }}
+        export -f bcf_printer
+
+        parallel -j {threads} --line-buffer bcf_printer ::: {input} > {output}
+        '''
