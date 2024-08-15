@@ -100,19 +100,72 @@ rule SV_comparison:
         awk ' {{ A[$1]+=1 }} END {{ print A["01"],A["10"],A["11"] }}' > {output.isec}
         '''
 
-rule find_disagreement_sites:
+rule SV_QTL_comparison:
     input:
-        expand(rules.happy.output['others'][0],sample=samples,chromosome=(1,),read1='mm2',read2='bwa',filtering='filtered')
+        jasmine = rules.SV_comparison.output['vcf'],
+        QTL = '/cluster/work/pausch/HiFi_QTL/QTL/{QTL}/117_samples/testing_imputation/Testis_filtered/conditional.all.txt'
     output:
-        sites = 'Illumina_HiFi_comparison/disconcordant.sites'
-    threads: 6
-    resources:
-        mem_mb = 2500
+        pop_only_SVs = 'PanGenie_comparison/unique_SVs.{QTL}.list',
+        significant_SVs = 'PanGenie_comparison/unique_SVs.{QTL}.significant.list',
     shell:
         '''
+        awk '$8~/SUPP_VEC=10/ {{print $3}}' {input.jasmine} > {output.pop_only_SVs}
+        LC_ALL=C; grep -Ff {output.pop_only_SVs} {input.QTL} | grep "1 1$" | sort -u > {output.significant_SVs}
+        '''
 
+rule find_disagreement_sites:
+    input:
+        expand('happy/{sample}.{chromosome}.mm2_bwa.bcf',sample=samples,chromosome=range(1,30))
+    output:
+        sites = 'Illumina_HiFi_comparison/disconcordant.sites'
+    threads: 8
+    resources:
+        mem_mb = 2500,
+        walltime = '24h'
+    shell:
+        '''
         bcf_printer() {{ bcftools view -m 2 -M 2 -v snps -e 'FORMAT/BD=="TP"' $1 | bcftools query -f '%CHROM %POS %INFO/Regions [%BVT ]' ; }}
         export -f bcf_printer
 
         parallel -j {threads} --line-buffer bcf_printer ::: {input} > {output}
+        '''
+
+rule group_SNP_sites:
+    input:
+        rules.find_disagreement_sites.output
+    output:
+        'Illumina_HiFi_comparison/disconcordant.bed'
+    threads: 1
+    resources:
+        mem_mb = 2500
+    shell:
+        '''
+        awk -v OFS='\\t' '{{print $1,$2,$2+1,$3,$4,$5}}' {input} | sort --parallel=2 -k1,1n -k2,2n | bedtools merge -d -1 -i /dev/stdin -o distinct,distinct,distinct,count -c 4,5,6,4 > {output}
+        '''
+
+rule SNP_disagreement:
+    input:
+        sites = rules.group_SNP_sites.output,
+        QTL = '/cluster/work/pausch/HiFi_QTL/QTL/{QTL}/117_samples/testing_imputation/Testis_filtered/conditional.all.txt'
+    output:
+        HiFi_only_SNPs = '',
+        significant_SNPs = ''
+    shell:
+        '''
+        grep -v "," {input.sites} | awk '$7>60 {{print $1"_"$2"_SNP"}}' > {output.HiFi_only_SNPs}
+        LC_ALL=C; grep -Ff {output.HiFi_only_SNPs} {input.QTL} | cut -d' ' -f 1 | sort | uniq -c | sort -k1,1nr > {output.significant_SNPs}
+        '''''
+
+rule temp:
+    input:
+        ''
+    output:
+        ''
+    shell:
+        '''
+        awk '$16<1 {print $1}' /cluster/work/pausch/HiFi_QTL/QTL/eQTL/117_samples/testing_HiFi_illumina/Testis_HiFi_filtered/permutations_all.{1..29}.01.05.significant.txt | sort -u  > eGenes.HiFi.txt
+        awk '$16<1e-10 {print $1}' /cluster/work/pausch/HiFi_QTL/QTL/eQTL/117_samples/testing_HiFi_illumina/Testis_HiFi_filtered/permutations_all.{1..29}.01.05.significant.txt | sort -u  > eGenes.HiFi.strict.txt
+
+        awk '$16<1 {print $1}' /cluster/work/pausch/HiFi_QTL/QTL/eQTL/117_samples/testing_HiFi_illumina/Testis_Illumina_filtered/permutations_all.{1..29}.01.05.significant.txt | sort -u  > eGenes.Illumina.txt
+        awk '$16<1e-10 {print $1}' /cluster/work/pausch/HiFi_QTL/QTL/eQTL/117_samples/testing_HiFi_illumina/Testis_Illumina_filtered/permutations_all.{1..29}.01.05.significant.txt | sort -u  > eGenes.Illumina.strict.txt
         '''
