@@ -51,7 +51,6 @@ rule methbat_profile:
         methbat profile --input-prefix {params.prefix} --input-regions {input.CpGs} --output-region-profile {output.profile} --output-asm-bed {output.ASM}
         '''
 
-
 samples_M = [l.strip() for l in open('config/Braunvieh_testis_subset.txt')]
 
 rule methbat_build:
@@ -67,7 +66,6 @@ rule methbat_build:
         '''
         methbat build --input-collection <(echo -e "{params.collection}") --output-profile {output.profile}
         '''
-
 
 ## re-profile using background as well as compare
 rule methbat_compare:
@@ -93,9 +91,9 @@ rule methbat_gather:
     input:
         expand(rules.methbat_compare.output,sample=samples_M)
     output:
-        'methylation/cohort.profiles'
+        'methylation/cohort.profiles.csv.gz'
     localrule: True
     shell:
         '''
-        touch {output}
+        awk 'NR==1&&FNR==1 {{print "sample\\t"$0; next}} {{if (NR>1) {{split(FILENAME,a,"."); print a[1]"\\t"$0 }} }}' {input} | pigz -p 2 > {output}
         '''
