@@ -42,7 +42,7 @@ rule prepare_CpG_windows:
     localrule: True
     shell:
         '''
-        bedtools makewindows -g <({input.fai}) -w 1000 > {output}
+        {{ echo -e "chrom\\tstart\\tend\\tcpg_label" ; bedtools makewindows -g {input.fai} -w 1000 | awk -v OFS='\\t' '{{print $0,$1"_"$2}}' ; }} > {output}
         '''
 
 rule methbat_profile:
@@ -75,7 +75,8 @@ rule methbat_build:
     params:
         collection = lambda wildcards, input: build_information_collection(samples,input.collection,input.metadata)
     resources:
-        mem_mb = 15000
+        mem_mb = lambda wildcards: 5000 if wildcards.mode == 'islands' else 85000,
+        walltime = lambda wildcards: '30m' if wildcards.mode == 'islands' else '2h'
     shell:
         '''
         methbat build --input-collection <(echo -e "{params.collection}") --output-profile {output.profile}
@@ -94,13 +95,16 @@ rule methbat_gather:
 
 rule tissue_specific_regions:
     input:
-        gtf = 'GCF_002263795.3_ARS-UCD2.0_genomic.gtf',
+        gtf = 'GCF_002263795.3_ARS-UCD2.0_genomic.gtf.gz',
         testis_specific_genes = 'methylation/tissue_specific/testis.list',
-        epididymis_specific_genes = 'methylation/tissue_specific/epididymis.list'
+        epididymis_specific_genes = 'methylation/tissue_specific/epididymis.list',
+        fai = config['reference'] + ".fai"
     output:
-        'methylation/tissue_specific/testis.bed'
+        'methylation/tissue_specific/genes.bed'
     shell:
         '''
-        grep -wf <(awk '{{print "\\""$1"\\""}}' {input.testis_specific_genes}) {input.gtf} | grep "start_codon" | cut -d' ' --output-delimiter=$'\\t' -f 1,4-5,7,10 | sort -u
-        grep -wf <(awk '{{print "\\""$1"\\""}}' {input.epididymis_specific_genes}) {input.gtf} | grep "start_codon" | cut -d' ' --output-delimiter=$'\\t' -f 1,4-5,7,10 | sort -u
+        zgrep -wf <(awk '{{print "\\""$1"\\""}}' {input.testis_specific_genes}) {input.gtf} | grep "start_codon" | cut -d' ' --output-delimiter=$'\\t' -f 1,4-5,7,10 | sort -u | awk '{{print $0"\\tTESTIS"}}' > $TMPDIR/temp.bed
+        zgrep -wf <(awk '{{print "\\""$1"\\""}}' {input.epididymis_specific_genes}) {input.gtf} | grep "start_codon" | cut -d' ' --output-delimiter=$'\\t' -f 1,4-5,7,10 | sort -u | awk '{{print $0"\\tEPIDIDYMIS"}}' >> $TMPDIR/temp.bed
+        sort -k1,1n -k2,2n $TMPDIR/temp.bed |
+        bedtools slop -i /dev/stdin -g {input.fai} -b 2500 > {output}
         '''
