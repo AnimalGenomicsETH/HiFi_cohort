@@ -108,3 +108,21 @@ rule tissue_specific_regions:
         sort -k1,1n -k2,2n $TMPDIR/temp.bed |
         bedtools slop -i /dev/stdin -g {input.fai} -b 2500 > {output}
         '''
+
+
+# Data from https://academic.oup.com/g3journal/article/13/8/jkad108/7175390#413067665
+rule prepare_TSS:
+    output:
+        multiext('methylation/TESTIS_TSS','.sites.bed','.enhancers.bed')
+    localrule: True
+    shell:
+        '''
+        TMPDIR=$(mktemp -d)
+        wget -P $TMPDIR https://api.faang.org/files/trackhubs/BOVREG_CAGE_EUROFAANG/ARS-UCD1.2/tissues_TSS/TSS_testis_countAbove10_bb_minusY.Bigbed
+        bigBedToBed -tsv $TMPDIR/TSS_testis_countAbove10_bb_minusY.Bigbed /dev/stdout |\
+        cut -f -4 | sed 's/chr//g' | sed '1d' | sort -k1,1V -k2,2n > {output[0]}
+
+        wget -P $TMPDIR https://api.faang.org/files/trackhubs/BOVREG_CAGE_EUROFAANG/ARS-UCD1.2/tissues_TSS-Enhancers/BC_testis_countAbove10_bb_minusY.Bigbed
+        bigBedToBed -tsv $TMPDIR/BC_testis_countAbove10_bb_minusY.Bigbed /dev/stdout |\
+        cut -f -4 | sed 's/chr//g' | sed '1d' | sort -k1,1V -k2,2n > {output[1]}
+        '''
