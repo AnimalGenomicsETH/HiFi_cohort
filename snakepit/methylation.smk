@@ -93,22 +93,32 @@ rule methbat_gather:
         awk 'NR==1&&FNR==1 {{print "sample\\t"$0; next}} {{if (NR>1) {{split(FILENAME,a,"."); print a[1]"\\t"$0 }} }}' {input} | pigz -p 2 > {output}
         '''
 
-rule tissue_specific_regions:
+rule get_lowly_expressed_testis_genes:
     input:
-        gtf = 'GCF_002263795.3_ARS-UCD2.0_genomic.gtf.gz',
-        testis_specific_genes = 'methylation/tissue_specific/testis.list',
-        epididymis_specific_genes = 'methylation/tissue_specific/epididymis.list',
-        fai = config['reference'] + ".fai"
+        TPM = '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/117_samples/TPM_gene_testis_UNFILTERED.tsv'
     output:
-        'methylation/tissue_specific/genes.bed'
+        bed = 'methylation/tissue_specific/TPM_testis.{logic}.bed'
+    params:
+        logic = lambda wildcards: f'>{wildcards.logic[1:]}' if wildcards.logic[0] == g else f'<{wildcards.logic[1:]}'
+    localrule: True
     shell:
         '''
-        zgrep -wf <(awk '{{print "\\""$1"\\""}}' {input.testis_specific_genes}) {input.gtf} | grep "start_codon" | cut -d' ' --output-delimiter=$'\\t' -f 1,4-5,7,10 | sort -u | awk '{{print $0"\\tTESTIS"}}' > $TMPDIR/temp.bed
-        zgrep -wf <(awk '{{print "\\""$1"\\""}}' {input.epididymis_specific_genes}) {input.gtf} | grep "start_codon" | cut -d' ' --output-delimiter=$'\\t' -f 1,4-5,7,10 | sort -u | awk '{{print $0"\\tEPIDIDYMIS"}}' >> $TMPDIR/temp.bed
-        sort -k1,1n -k2,2n $TMPDIR/temp.bed |
-        bedtools slop -i /dev/stdin -g {input.fai} -b 2500 > {output}
+        awk -v OFS='\\t' 'NR>1 {{a=0; for (i=6;i<=NF;i++) {{a+=$i,N=(NF-6)}}; if((a/N {params.logic}) {{ print $1,$2,$3,$4,$6,a/N }} }}' {input.TPM} > {output.bed}
         '''
 
+rule get_gene_start_coordinates:
+    input:
+        gtf = 'GCF_002263795.3_ARS-UCD2.0_genomic.gtf.gz',
+        genes = 'methylation/tissue_specific/{reason}.bed',
+        fai = config['reference'] + ".fai"
+    output:
+        bed 'methylation/tissue_specific/{reason}.bed'
+    shell:
+        '''
+        zgrep -wf <(awk '{{print "\\""$1"\\""}}' {input.genes}) | grep "start_codon" | cut -d' ' --output-delimiter=$'\\t' -f 1,4-5,7,10 | sort -u | awk '{{print $0"\\t{wildcards.reason}"}}' |\
+        sort -k1,1n -k2,2n |\
+        bedtools slop -i /dev/stdin -g {input.fai} -b 500 > {output.bed}
+        '''
 
 # Data from https://academic.oup.com/g3journal/article/13/8/jkad108/7175390#413067665
 rule prepare_TSS:
