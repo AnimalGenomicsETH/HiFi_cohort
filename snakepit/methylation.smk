@@ -93,7 +93,9 @@ rule methbat_compare:
         walltime = '30m'
     shell:
         '''
-        methbat compare --input-profile {input} --output-comparison {output} --compare-category EPIDIDYMIS --baseline-category TESTIS
+        methbat compare --input-profile {input} --output-comparison {output} \
+        --compare-category EPIDIDYMIS --baseline-category TESTIS \
+        --min-zscore 3 --min-delta 0.2 --min-samples 10
         '''
 
 rule compare_compares:
@@ -178,3 +180,31 @@ rule reformat_TSS:
         '''
         {{ echo -e "chrom\\tstart\\tend\\tcpg_label" ; cat {input} ; }} > {output}
         '''
+
+## CpG site analysis
+
+#this will be a lot of data, so save encoding redundant information in the filename rather than per-line
+rule convert_bed_to_csv:
+    input:
+        expand(rules.pb_CpG_tools.output['bed'],mapper='mm2',allow_missing=True)
+    output:
+        'methylation/sites/{sample}.{chromosome}.csv.gz'
+    shell:
+        '''
+        awk '$1=={wildcards.chromosome} {{ print $2,$4 }}' {input} | pigz -p 2 -c > {output} 
+        '''
+
+rule find_all_reference_CpG_dinucleotides:
+    input:
+        reference = config['reference']
+    output:
+        'methylation/sites/reference.bed'
+    run:
+        import regex
+        CpG = regex.compile('CG')
+        for l in open(input.reference): #need to likely handle zipped file
+            if l.startwith('>'):
+                chromosome = l[1:]
+            else:
+                for hit in CpG.findall(l):
+                    print(f'{chromosome}\t{hit.start()}\t{hit.start()+1}')
