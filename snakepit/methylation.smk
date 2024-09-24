@@ -199,12 +199,17 @@ rule find_all_reference_CpG_dinucleotides:
         reference = config['reference']
     output:
         'methylation/sites/reference.bed'
+    localrule: True
     run:
         import regex
-        CpG = regex.compile('CG')
-        for l in open(input.reference): #need to likely handle zipped file
-            if l.startwith('>'):
-                chromosome = l[1:]
-            else:
-                for hit in CpG.findall(l):
-                    print(f'{chromosome}\t{hit.start()}\t{hit.start()+1}')
+        import gzip
+        CpG = regex.compile('(?i)CG')
+        with open(output[0],'w') as fout, gzip.open(input.reference,'rt') as fin:
+            offset = 0
+            for line in fin:
+                if line.startswith('>'):
+                    chromosome = line.rstrip()[1:]
+                else:
+                    for hit in CpG.finditer(line):
+                        fout.write(f'{chromosome}\t{offset+hit.start()}\t{offset+hit.end()}\n')
+                    offset += len(line)
