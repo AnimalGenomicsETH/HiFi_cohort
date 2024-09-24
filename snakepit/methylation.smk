@@ -203,13 +203,18 @@ rule find_all_reference_CpG_dinucleotides:
     run:
         import regex
         import gzip
-        CpG = regex.compile('(?i)CG')
+        CpG = regex.compile('CG')
         with open(output[0],'w') as fout, gzip.open(input.reference,'rt') as fin:
             offset = 0
-            for line in fin:
+            ends_in_C = False
+            for line in (line.rstrip().upper() for line in fin):
                 if line.startswith('>'):
-                    chromosome = line.rstrip()[1:]
+                    chromosome = line[1:]
+                    offset = 0
                 else:
+                    if ends_in_C and line.startswith('G'):
+                        fout.write(f'{chromosome}\t{offset-1}\t{offset+1}\n')
                     for hit in CpG.finditer(line):
                         fout.write(f'{chromosome}\t{offset+hit.start()}\t{offset+hit.end()}\n')
                     offset += len(line)
+                    ends_in_C = line.endswith('C')
