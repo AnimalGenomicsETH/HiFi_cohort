@@ -100,17 +100,16 @@ rule methbat_compare:
 
 rule compare_compares:
     input:
-        expand(rules.methbat_compare.output,mode=(''))
+        expand(rules.methbat_compare.output,mode=('islands','TPM_testis.l0.01','TPM_testis.g5'))
     output:
         'methylation/comparisons.csv'
     localrule: True
     shell:
         '''
         echo "regions InsufficientData Uncategorized HyperASM HypoASM HyperMethylated HypoMethylated" > {output}
-        for i in TPM_testis.l0.01 TPM_testis.g5 islands;
         for F in {input}
         do
-          awk -v N=$(basename $F) 'NR>1 {{++L[$6]}} END {{print N,L["InsufficientData"],L["Uncategorized"],L["HyperASM"],L["HypoASM"],L["HyperMethylated"],L["HypoMethylated"]}}' $F
+          awk -v N=$(basename ${{F%.compare}}) 'NR>1 {{++L[$6]}} END {{print N,L["InsufficientData"],L["Uncategorized"],L["HyperASM"],L["HypoASM"],L["HyperMethylated"],L["HypoMethylated"]}}' $F
         done >> {output}
         '''
 
@@ -125,11 +124,11 @@ rule methbat_gather:
         awk 'NR==1&&FNR==1 {{print "sample\\t"$0; next}} {{if (NR>1) {{split(FILENAME,a,"."); print a[1]"\\t"$0 }} }}' {input} | pigz -p 2 > {output}
         '''
 
-rule get_lowly_expressed_testis_genes:
+rule get_lowly_expressed_genes:
     input:
-        TPM = '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/117_samples/TPM_gene_testis_UNFILTERED.tsv'
+        TPM = lambda wildcards: '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/117_samples/TPM_gene_testis_UNFILTERED.tsv' if wildcards.tissue == 'testis' else '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/117_samples/TPM_gene_testis_UNFILTERED.tsv' #'/cluster/work/pausch/alex/Pop_HiFi/methylation/tissue_specific/Epidiymis_gene_TPM_unfiltered_UCD1.2.tsv'
     output:
-        bed = 'methylation/tissue_specific/TPM_testis.{logic}.list'
+        bed = 'methylation/tissue_specific/TPM_{tissue}.{logic}.list'
     params:
         logic = lambda wildcards: f'>{wildcards.logic[1:]}' if wildcards.logic[0] == 'g' else f'<{wildcards.logic[1:]}'
     localrule: True
@@ -223,3 +222,18 @@ rule find_all_reference_CpG_dinucleotides:
                         fout.write(f'{chromosome}\t{offset+hit.start()}\t{offset+hit.end()}\n')
                     offset += len(line)
                     ends_in_C = line.endswith('C')
+
+rule print_GT_matrix:
+    input:
+        vcf = multiext('mm2_DV/{chromosome}.Unrevised.vcf.gz','','.tbi'),
+        CGs = rules.find_all_reference_CpG_dinucleotides.output
+    output:
+        'methylation/sites/{chromosome}.GTs.csv.gz'
+    threads: 1
+    resources:
+        mem_mb = 2500,
+        walltime = '1h'
+    shell:
+        '''
+        {{ echo -n "position " ; bcftools query -l {input.vcf[0]} | tr '\\n' ' ' | sed 's/.$/\\n/' ; bcftools query -R {input.CGs} -f '%POS[ %GT]' {input.vcf[0]} ; }} | pigz -p 2 -c > {output}
+        '''
