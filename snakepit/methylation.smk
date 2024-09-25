@@ -189,9 +189,13 @@ rule convert_bed_to_csv:
         expand(rules.pb_CpG_tools.output['bed'],mapper='mm2',allow_missing=True)
     output:
         'methylation/sites/{sample}.{chromosome}.csv.gz'
+    threads: 1
+    resources:
+        mem_mb = 1500,
+        walltime = '30m'
     shell:
         '''
-        awk '$1=={wildcards.chromosome} {{ print $2,$4 }}' {input} | pigz -p 2 -c > {output} 
+        {{ echo "position {wildcards.sample}" ; awk '$1=={wildcards.chromosome} {{ print $2,$4 }}' {input} ; }} | pigz -p 2 -c > {output}
         '''
 
 rule find_all_reference_CpG_dinucleotides:
@@ -211,6 +215,7 @@ rule find_all_reference_CpG_dinucleotides:
                 if line.startswith('>'):
                     chromosome = line[1:]
                     offset = 0
+                    ends_in_C = False
                 else:
                     if ends_in_C and line.startswith('G'):
                         fout.write(f'{chromosome}\t{offset-1}\t{offset+1}\n')
