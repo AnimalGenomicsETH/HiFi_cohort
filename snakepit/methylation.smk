@@ -235,5 +235,5 @@ rule print_GT_matrix:
         walltime = '1h'
     shell:
         '''
-        {{ echo -n "position REF " ; bcftools query -l {input.vcf[0]} | tr '\\n' ' ' | sed 's/.$/\\n/' ; bcftools query -R {input.CGs} -f '%POS %REF[ %GT]' {input.vcf[0]} ; }} | pigz -p 2 -c > {output}
+        {{ echo -n "position REF ALT " ; bcftools query -l {input.vcf[0]} | tr '\\n' ' ' | sed 's/.$/\\n/' ; bcftools query -f '%POS %REF %ALT[ %GT]' {input.vcf[0]} ; }} | pigz -p 2 -c > {output}
         '''
