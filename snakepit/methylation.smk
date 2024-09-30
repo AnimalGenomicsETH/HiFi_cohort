@@ -48,7 +48,7 @@ rule prepare_CpG_windows:
 rule methbat_profile:
     input:
         bed = expand(rules.pb_CpG_tools.output['bed'],mapper='mm2',allow_missing=True),
-        regions = lambda wildcards:  'methylation/CpG_{mode}.bed' if wildcards._group == 'individual' else 'methylation/cohort.{mode}.BAT'
+        regions = lambda wildcards:  'methylation/CpG_{mode}.bed' if wildcards._group == 'individual' else 'methylation/{_group}.{mode}.BAT'
     output:
         BAT = multiext('methylation/{sample}.{mode}.{_group}.BAT','.profile','.ASM')
     params:
@@ -62,18 +62,29 @@ rule methbat_profile:
         methbat profile --input-prefix {params.prefix} --input-regions {input.regions} --output-region-profile {output.BAT[0]} --output-asm-bed {output.BAT[1]}
         '''
 
+def get_samples(subset):
+    import polars as pl
+    information = pl.read_csv('methylation/cohort_information.tsv',separator='\t')
+
+    match subset:
+        case 'cohort':
+            return information.get_column('identifier').to_list()
+        case 'testis_BV':
+            return information.filter((pl.col('labels').str.contains(r'TESTIS'))&(pl.col('labels').str.contains(r';BV'))).get_column('identifier').to_list()
+
+
 def build_information_collection(samples,profiles,metadata):
     labels = {line.split()[0]:line.split()[2] for n,line in enumerate(open(metadata)) if n>0}
     return "identifier\\tfilename\\tlabels\\n" + '\\n'.join(f'{S}\\t{P}\\t{labels[S]}' for S,P in zip(samples,profiles))
 
 rule methbat_build:
     input:
-        collection = expand(rules.methbat_profile.output['BAT'][0],_group='individual',sample=samples,allow_missing=True),
+        collection = lambda wildcards: expand(rules.methbat_profile.output['BAT'][0],_group='individual',sample=get_samples(wildcards.cohort),allow_missing=True),
         metadata = 'methylation/cohort_information.tsv'
     output:
-        profile = 'methylation/cohort.{mode}.BAT'
+        profile = 'methylation/{cohort}.{mode}.BAT'
     params:
-        collection = lambda wildcards, input: build_information_collection(samples,input.collection,input.metadata)
+        collection = lambda wildcards, input: build_information_collection(get_samples(wildcards.cohort),input.collection,input.metadata)
     resources:
         mem_mb = lambda wildcards: 5000 if wildcards.mode == 'islands' else 85000,
         walltime = lambda wildcards: '30m' if wildcards.mode == 'islands' else '2h'
@@ -86,7 +97,7 @@ rule methbat_compare:
     input:
         rules.methbat_build.output['profile']
     output:
-        'methylation/cohort.{mode}.compare'
+        'methylation/{cohort}.{mode}.compare'
     threads: 1
     resources:
         mem_mb = 5000,
@@ -100,7 +111,7 @@ rule methbat_compare:
 
 rule compare_compares:
     input:
-        expand(rules.methbat_compare.output,mode=('islands','TPM_testis.l0.01','TPM_testis.g5'))
+        expand(rules.methbat_compare.output,mode=('islands','TPM_testis.l0.01','TPM_testis.g5'),cohort='cohort')
     output:
         'methylation/comparisons.csv'
     localrule: True
@@ -115,13 +126,13 @@ rule compare_compares:
 
 rule methbat_gather:
     input:
-        expand(rules.methbat_profile.output['BAT'][0],_group='cohort',sample=samples,allow_missing=True)
+        lambda wildcards: expand(rules.methbat_profile.output['BAT'][0],_group=wildcards.cohort,sample=get_samples(wildcards.cohort),allow_missing=True)
     output:
-        'methylation/{mode}.cohort.profiles.csv.gz'
+        'methylation/{cohort}.{mode}.profiles.csv.gz'
     localrule: True
     shell:
         '''
-        awk 'NR==1&&FNR==1 {{print "sample\\t"$0; next}} {{if (NR>1) {{split(FILENAME,a,"."); print a[1]"\\t"$0 }} }}' {input} | pigz -p 2 > {output}
+        awk 'NR==1&&FNR==1 {{print "sample\\t"$0; next}} {{if (FNR>1) {{split(FILENAME,a,"."); print a[1]"\\t"$0 }} }}' {input} | pigz -p 2 > {output}
         '''
 
 rule get_lowly_expressed_genes:
