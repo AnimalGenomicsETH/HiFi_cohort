@@ -33,7 +33,7 @@ rule isoseq_cluster2:
      conda: 'pbccs'
      threads: 8
      resources:
-         mem_mb = 1000,
+         mem_mb = 2000,
          walltime = '1h'
      shell:
          '''
@@ -48,9 +48,10 @@ rule isoseq_pbmm2:
     output:
         bam = multiext('isoseq/{sample}/aligned.bam','','.bai')
     conda: 'pbccs'
-    threads: 12
+    threads: 6
     resources:
-        mem_mb = 4000
+        mem_mb = 6500,
+        walltime = '1h'
     shell:
         '''
         pbmm2 align -j {threads} --preset ISOSEQ --sort {input.bam} {input.reference} {output.bam[0]}
@@ -59,14 +60,17 @@ rule isoseq_pbmm2:
 rule isoseq_collapse:
     input:
         mapped_bam = rules.isoseq_pbmm2.output['bam'][0],
-        flnc_bams = lambda wildcards: expand(rules.isoseq_refine.output['bam'][0],SMRT=get_SMRT_cells_per_sample(wildcards.sample),sample=wildcards.sample)
+        flnc_bams = lambda wildcards: expand(rules.isoseq_refine.output['bam'][0],SMRT=get_SMRT_cells_per_sample(wildcards.sample),sample=wildcards.sample),
+        fofn = rules.isoseq_cluster2.output['fofn']
     output:
-        gff = 'isoseq/{sample}.gff'
+        gff = 'isoseq/{sample}.gff',
+        summary = multiext('isoseq/{sample}','.report.json','.read_stat.txt','.group.txt','.flnc_count.txt','.fasta','.abundance.txt')
     conda: 'pbccs'
-    threads: 4
+    threads: 2
     resources:
-        memb_mb = 5000
+        mem_mb = 1000,
+        walltime = '30m'
     shell:
         '''
-        isoseq collapse -j {threads} --do-not-collapse-extra-5exons {input.mapped_bam} <(ls {input.flnc_bams}) {output.gff}
+        isoseq collapse -j {threads} --do-not-collapse-extra-5exons {input.mapped_bam} {input.fofn} {output.gff}
         '''
