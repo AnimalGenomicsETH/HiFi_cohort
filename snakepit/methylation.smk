@@ -137,9 +137,9 @@ rule methbat_gather:
 
 rule get_lowly_expressed_genes:
     input:
-        TPM = lambda wildcards: '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/117_samples/TPM_gene_testis_UNFILTERED.tsv' if wildcards.tissue == 'testis' else '/cluster/work/pausch/HiFi_QTL/gene_expression/testis/UCD2.0_masked/117_samples/TPM_gene_testis_UNFILTERED.tsv' #'/cluster/work/pausch/alex/Pop_HiFi/methylation/tissue_specific/Epidiymis_gene_TPM_unfiltered_UCD1.2.tsv'
+        TPM = 'RefSeq_TPM/{tissue}.tsv'
     output:
-        bed = 'methylation/tissue_specific/TPM_{tissue}.{logic}.list'
+        bed = 'methylation/tissue_specific/TPM_{tissue,testis|epidiymis|vas}.{logic}.list'
     params:
         logic = lambda wildcards: f'>{wildcards.logic[1:]}' if wildcards.logic[0] == 'g' else f'<{wildcards.logic[1:]}'
     localrule: True
