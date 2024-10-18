@@ -139,7 +139,7 @@ rule get_lowly_expressed_genes:
     input:
         TPM = 'RefSeq_TPM/{tissue}.tsv'
     output:
-        bed = 'methylation/tissue_specific/TPM_{tissue,testis|epidiymis|vas}.{logic}.list'
+        bed = 'methylation/tissue_specific/TPM_{tissue,testis|epididymis|vas}.{logic}.list'
     params:
         logic = lambda wildcards: f'>{wildcards.logic[1:]}' if wildcards.logic[0] == 'g' else f'<{wildcards.logic[1:]}'
     localrule: True
@@ -155,12 +155,16 @@ rule get_gene_start_coordinates:
         fai = config['reference'] + ".fai"
     output:
         bed = 'methylation/tissue_specific/{reason}.TSS.bed'
-    localrule: True
+    threads: 1
+    resources:
+        mem_mb = 5000,
+        walltime = '4h'
     shell:
         '''
+        #alternative awk '$3=="start_codon"&&!($10 in A) {{A[$10]=$1"\\t"$4"\\t"$5"\\t"$7}} END {{for (k in A) {{print A[k]"\\t"k"\\t{wildcards.reason}"}} }}'
         zgrep -wf <(awk '{{print "\\""$1"\\""}}' {input.genes}) {input.gtf} | grep "start_codon" | cut -d' ' --output-delimiter=$'\\t' -f 1,4-5,7,10 | sort -u | awk '{{print $0"\\t{wildcards.reason}"}}' |\
-        sort -k1,1V -k2,2n |\
-        awk -v OFS='\\t' '$4=="+" {{ print $1,$2-1250,$3-750,$4;next }} {{print $1,$2+750,$3+1250,$4}}' > {output.bed} #adjust start coding to account for 500bp window around TSS, which is 1 Kb up/down of start_codon
+        awk -v OFS='\\t' '$4=="+" {{ print $1,$2-1250,$3-750,$4,$5,$6;next }} {{print $1,$2+750,$3+1250,$4,$5,$6}}' |\
+        sort -k1,1V -k2,2n > {output.bed} #adjust start coding to account for 500bp window around TSS, which is 1 Kb up/down of start_codon
         '''
 
 # Data from https://academic.oup.com/g3journal/article/13/8/jkad108/7175390#413067665
@@ -189,6 +193,20 @@ rule reformat_TSS:
     shell:
         '''
         {{ echo -e "chrom\\tstart\\tend\\tcpg_label" ; cat {input} ; }} > {output}
+        '''
+
+rule bedtools_multiinter:
+    input:
+        expand(rules.get_gene_start_coordinates.output['bed'],reason=('TPM_testis.g5','TPM_testis.l0.01','TPM_epididymis.l0.01','TPM_epididymis.l0.01','TPM_vas.g5','TPM_vas.l0.01'))
+    output:
+        overlap = 'methylation/tissue_specific/overlap.bed',
+        CpG = 'methylation/CpG_TSS.bed'
+    localrule: True
+    shell:
+        '''
+        bedtools multiinter -names {input} -i {input} > {output.overlap}
+
+        {{ echo -e "chrom\\tstart\\tend\\tcpg_label" ; cut -f -4 {input} ; }} > {output.CpG}
         '''
 
 ## CpG site analysis
