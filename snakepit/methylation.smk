@@ -86,7 +86,7 @@ rule methbat_build:
     params:
         collection = lambda wildcards, input: build_information_collection(get_samples(wildcards.cohort),input.collection,input.metadata)
     resources:
-        mem_mb = lambda wildcards: 5000 if wildcards.mode == 'islands' else 85000,
+        mem_mb = lambda wildcards: 5000 if wildcards.mode == 'islands' else 5000,
         walltime = lambda wildcards: '30m' if wildcards.mode == 'islands' else '2h'
     shell:
         '''
@@ -197,16 +197,16 @@ rule reformat_TSS:
 
 rule bedtools_multiinter:
     input:
-        expand(rules.get_gene_start_coordinates.output['bed'],reason=('TPM_testis.g5','TPM_testis.l0.01','TPM_epididymis.l0.01','TPM_epididymis.l0.01','TPM_vas.g5','TPM_vas.l0.01'))
+        expand(rules.get_gene_start_coordinates.output['bed'],reason=('TPM_testis.g5','TPM_testis.l0.01','TPM_epididymis.g5','TPM_epididymis.l0.01','TPM_vas.g5','TPM_vas.l0.01'))
     output:
         overlap = 'methylation/tissue_specific/overlap.bed',
         CpG = 'methylation/CpG_TSS.bed'
     localrule: True
     shell:
         '''
-        bedtools multiinter -names {input} -i {input} > {output.overlap}
+        bedtools multiinter -header -names {input} -i {input} > {output.overlap}
 
-        {{ echo -e "chrom\\tstart\\tend\\tcpg_label" ; cut -f -4 {input} ; }} > {output.CpG}
+        {{ echo -e "chrom\\tstart\\tend\\tcpg_label" ; awk 'NR>1' {output.overlap} | cut -f -4 ; }} > {output.CpG}
         '''
 
 ## CpG site analysis
