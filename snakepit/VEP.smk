@@ -1,20 +1,34 @@
-workflow._singularity_args += ' -B /nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data -B /cluster/work/pausch/inputs '
+workflow._singularity_args += ' -B /cluster/work/pausch/inputs '
+
+rule prepare_GTF:
+    output:
+        'ARS-UCD2.0_genomic.gtf.gz'
+    localrule: True
+    shell:
+        '''
+        wget -qO - https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/002/263/795/GCF_002263795.3_ARS-UCD2.0/GCF_002263795.3_ARS-UCD2.0_genomic.gtf.gz |
+        zgrep -ve "Curated" -ve "miRNA" -ve "#" |
+        sort -k1,1V -k4,4n -k5,5n -t$'\\t' |
+        bgzip -c > {output[0]}
+
+        tabix -p gff {output[0]}
+        '''
 
 rule VEP:
     input:
         vcf = 'final_set/final_filtered.all.vcf.gz',
-        gff = '/cluster/work/pausch/HiFi_QTL/GCF_002263795.3_ARS-UCD2.0_genomic.gff',
+        gtf = rules.prepare_GTF.output,
         reference = '/cluster/work/pausch/inputs/ref/BTA/UCD2.0/GCA_002263795.4_ARS-UCD2.0_genomic.fa'
     output:
-        vcf = multiext('/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/projects/eQTL_cohort/HiFi/refseq_vep.vcf.gz','','.tbi'),
-        stats = '/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/projects/eQTL_cohort/HiFi/refseq.stats'
+        vcf = multiext('refseq_vep.vcf.gz','','.tbi'),
+        stats = 'refseq.stats.txt'
     container: '/cluster/work/pausch/alex/software/images/ensembl-vep_release_113.0.sif'
-    threads: 1
+    threads: 8
     resources:
-        mem_mb = 5000,
+        mem_mb = 1000,
         walltime = '4h'
     shell:
         '''
-        vep -i {input.vcf} -gff {input.gff} -fasta {input.reference} --hgvs --symbol -o {output.vcf[0]} --compress_output bgzip --stats_file {output.stats} --stats_text --vcf
+        vep --fork {threads} -i {input.vcf} -gtf {input.gtf[0]} -fasta {input.reference} --hgvs --symbol -o {output.vcf[0]} --compress_output bgzip --stats_file {output.stats} --stats_text --vcf
         tabix -p vcf {output.vcf[0]}
         '''
