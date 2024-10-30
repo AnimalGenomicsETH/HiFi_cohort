@@ -2,7 +2,7 @@ workflow._singularity_args += ' -B /cluster/work/pausch/inputs '
 
 rule prepare_GTF:
     output:
-        'ARS-UCD2.0_genomic.gtf.gz'
+        multiext('ARS-UCD2.0_genomic.gtf.gz','','.tbi')
     localrule: True
     shell:
         '''
@@ -14,14 +14,29 @@ rule prepare_GTF:
         tabix -p gff {output[0]}
         '''
 
+rule filter_GTF:
+    input:
+        gtf = rules.prepare_GTF.output,
+        eGenes = 'gene_expression/testis/UCD2.0_masked/117_samples/TPM_gene_testis_UNFILTERED.tsv'
+    output:
+        multiext('VEP/ARS-UCD2.0_genomic.eGene.gtf.gz','','.tbi')
+    localrule: True
+    shell:
+        '''
+        zgrep -wf <(awk 'NR>1 {{print $4}}' {input.eGenes}) {input.gtf[0]} |\
+        bgzip -c > {output[0]}
+
+        tabix -p gff {output[0]}
+        '''
+
 rule VEP:
     input:
         vcf = 'final_set/final_filtered.all.vcf.gz',
-        gtf = rules.prepare_GTF.output,
+        gtf = lambda wildcards: rules.prepare_GTF.output if wildcards.set == 'genomic' else rules.filter_GTF.output,
         reference = '/cluster/work/pausch/inputs/ref/BTA/UCD2.0/GCA_002263795.4_ARS-UCD2.0_genomic.fa'
     output:
-        vcf = multiext('refseq_vep.vcf.gz','','.tbi'),
-        stats = 'refseq.stats.txt'
+        vcf = multiext('VEP/refseq_vep.{set}.vcf.gz','','.tbi'),
+        stats = 'VEP/refseq.stats.{set}.txt'
     container: '/cluster/work/pausch/alex/software/images/ensembl-vep_release_113.0.sif'
     threads: 8
     resources:
