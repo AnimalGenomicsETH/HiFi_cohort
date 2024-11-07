@@ -47,3 +47,19 @@ rule VEP:
         vep --fork {threads} -i {input.vcf} -gtf {input.gtf[0]} -fasta {input.reference} --hgvs --symbol -o {output.vcf[0]} --compress_output bgzip --stats_file {output.stats} --stats_text --vcf
         tabix -p vcf {output.vcf[0]}
         '''
+
+rule overlap_annotations:
+    input:
+        vep = rules.VEP.output['vcf'],
+        gtf = lambda wildcards: rules.prepare_GTF.output if wildcards.set == 'genomic' else rules.filter_GTF.output
+    output:
+        multiext('VEP/{set}','.INS.bed','.CDS.bed','.overlap.bed')
+    localrule: True
+    shell:
+        '''
+        bcftools +split-vep -i 'INFO/SVTYPE="INS"' -f '%CHROM\t%POS\t%ID\t%IMPACT' {input.vep[0]} | awk -v OFS='\\t' '{{print $1,$2,$2+1,$3,$4}}' > {output[0]}
+
+        zcat {input.gtf[0]} | awk -v OFS='\\t' '$3=="CDS" {{print $1,$4,$5,$10}}' | sort -k1,1V -k2,2n | bedtools merge -d 0 -o distinct -c 4 > {output[1]}
+
+        bedtools intersect -wo -a {output.[1]} -b {output.[0]} > {output.[2]]}
+        '''
