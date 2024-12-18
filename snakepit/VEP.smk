@@ -29,6 +29,7 @@ rule filter_GTF:
         tabix -p gff {output[0]}
         '''
 
+#TODO: wildcard for taking in the {bwa,mm2}_DV variants
 rule VEP:
     input:
         vcf = 'final_set/final_filtered.all.vcf.gz',
