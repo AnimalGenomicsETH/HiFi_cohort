@@ -57,8 +57,8 @@ rule bedtools_coverage:
 
 rule gather_samples:
     input:
-        expand(rules.samtools_bedcov.output,sample=config['samples'],mapper=('mm2','bwa'),filtering=('default','secondary','quality')),
-         expand(rules.bedtools_coverage.output,sample=config['samples'],mapper=('mm2','bwa'),filtering=('filtered','beagle4_filtered'))
+        expand(rules.samtools_bedcov.output,sample=samples,mapper=('mm2','bwa'),filtering=('default','secondary','quality')),
+         expand(rules.bedtools_coverage.output,sample=samples,mapper=('mm2','bwa'),filtering=('filtered','beagle4_filtered'))
     output:
         'coverage/regions.csv.gz'
     localrule: True

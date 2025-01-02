@@ -94,7 +94,7 @@ rule cramino_stats:
 
 rule gather_alignment_stats:
     input:
-        expand(rules.cramino_stats.output,sample=config['samples'],allow_missing=True)
+        expand(rules.cramino_stats.output,sample=samples,allow_missing=True)
     output:
         'alignments/{mapper}.stats.csv'
     localrule: True
@@ -106,7 +106,7 @@ rule gather_alignment_stats:
 
 rule fastp_filter:
     input:
-        expand('/cluster/work/pausch/inputs/fastq/BTA_eQTL/{{sample}}_R{N}.fastq.gz',N=(1,2))
+        expand(config['short_reads']+'{{sample}}_R{N}.fastq.gz',N=(1,2))
     output:
         fastq = temp(expand('fastq/{sample}.R{N}.fastq.gz',N=(1,2),allow_missing=True))
     params:

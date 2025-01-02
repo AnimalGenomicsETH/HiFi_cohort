@@ -1,5 +1,3 @@
-workflow._singularity_args += ' -B /cluster/work/pausch/inputs '
-
 rule prepare_GTF:
     output:
         multiext('ARS-UCD2.0_genomic.gtf.gz','','.tbi')
@@ -32,9 +30,9 @@ rule filter_GTF:
 #TODO: wildcard for taking in the {bwa,mm2}_DV variants
 rule VEP:
     input:
-        vcf = 'final_set/final_filtered.all.vcf.gz',
+        vcf = 'mm2_DV/1.Unrevised.vcf.gz',
         gtf = lambda wildcards: rules.prepare_GTF.output if wildcards.set == 'genomic' else rules.filter_GTF.output,
-        reference = '/cluster/work/pausch/inputs/ref/BTA/UCD2.0/GCA_002263795.4_ARS-UCD2.0_genomic.fa'
+        reference = config['reference']
     output:
         vcf = multiext('VEP/refseq_vep.{set}.vcf.gz','','.tbi'),
         stats = 'VEP/refseq.stats.{set}.txt'
@@ -58,9 +56,13 @@ rule overlap_annotations:
     localrule: True
     shell:
         '''
-        bcftools +split-vep -i 'INFO/SVTYPE="INS"' -f '%CHROM\t%POS\t%ID\t%IMPACT' {input.vep[0]} | awk -v OFS='\\t' '{{print $1,$2,$2+1,$3,$4}}' > {output[0]}
+        bcftools +split-vep -i 'INFO/SVTYPE="INS"' -f '%CHROM\\t%POS\\t%ID\\t%IMPACT' {input.vep[0]} |\
+        awk -v OFS='\\t' '{{print $1,$2,$2+1,$3,$4}}' > {output[0]}
 
-        zcat {input.gtf[0]} | awk -v OFS='\\t' '$3=="CDS" {{print $1,$4,$5,$10}}' | sort -k1,1V -k2,2n | bedtools merge -d 0 -o distinct -c 4 > {output[1]}
+        zcat {input.gtf[0]} |\
+        awk -v OFS='\\t' '$3=="CDS" {{print $1,$4,$5,$10}}' |\
+        sort -k1,1V -k2,2n |\
+        bedtools merge -d 0 -o distinct -c 4 > {output[1]}
 
-        bedtools intersect -wo -a {output.[1]} -b {output.[0]} > {output.[2]]}
+        bedtools intersect -wo -a {output[1]} -b {output[0]} > {output[2]}
         '''

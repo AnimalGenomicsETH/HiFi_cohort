@@ -135,7 +135,7 @@ rule sniffles_call:
         TR = 'GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed'
     output:
         vcf = '{mapper}_SVs/{sample}.sniffles.denovo.vcf.gz',
-	    snf = '{mapper}_SVs/{sample}.sniffles.snf'
+        snf = '{mapper}_SVs/{sample}.sniffles.snf'
     threads: 4
     resources:
         mem_mb = 2000
@@ -179,7 +179,7 @@ rule sniffles_filter:
 rule sniffles_genotype:
     input:
         bam = expand(rules.samtools_merge.output,allow_missing=True),
-        TR = 'GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed',
+        TR = config['reference_TRF'],
         SV_panel = rules.sniffles_filter.output
     output:
         vcf = '{mapper}_SVs/{sample}.sniffles.forced.vcf.gz'
@@ -261,14 +261,14 @@ rule bcftools_concat_QTL:
 
 rule split_SV_sequences:
     input:
-        '/cluster/work/pausch/HiFi_QTL/variants/HiFi/sniffles2/{region}.vcf.gz'
+        expand(rules.bcftools_merge_sniffles.output,mapper='mm2',allow_missing=True)
     output:
         'mm2_SVs/SV_sequences/{region}.fa'
     shell:
         '''
-        bcftools query -f '%ID\\t%REF\\t%ALT\\n' {input[0]} |\
-        awk 'length($2)>length($3) {{print ">"$1"\\n"$2;next}} {{print ">"$1"\\n"$3}}' \
-        > {output}
+        bcftools query -f '%ID\\t%REF\\t%ALT\\t%INFO/SVTYPE\\t%INFO/SVLEN' {input} |\
+        awk '$4!="."&&$3!~/</ {{if (length($2)>length($3)) {{print ">"$1"_"$4"_"$5"\\n"$2}} else {{print ">"$1"_"$4"_"$5"\n"$3}} }}' |\
+        seqtk seq -U - > {output}
         '''
 
 rule repeat_masker:
@@ -282,7 +282,7 @@ rule repeat_masker:
         walltime = '4h'
     shell:
         '''
-        RepeatMasker -xsmall -pa $(({threads}/1)) -e rmblast -lib {config[repeat_library]} -qq -no_is {input}
+        RepeatMasker -pa $(({threads}/1)) -e rmblast -lib {config[repeat_library]} -q -no_is {input}
         if [ ! -f {output} ]; then
           seqtk seq -l60 {input} > {output}
         fi
@@ -303,18 +303,18 @@ rule merge_masked_chromosomes:
         out = expand(rules.repeat_masker.output,region=regions[:-2],allow_missing=True),
         trf = expand(rules.TRF.output,region=regions[:-2],allow_missing=True),
     output:
-        out = '{mapper}_SVs/SV_sequences.out.gz',
-        trf = '{mapper}_SVs/SV_sequences.trf.gz'
+        repeats = '{mapper}_SVs/SV_sequences.repeats.gz',
+        VNTRs = '{mapper}_SVs/SV_sequences.VNTRs.gz'
     localrule: True
     shell:
         '''
-        cat {input.out} | bgzip --threads {threads} -c > {output.out}
-        cat {input.trf} | bgzip --threads {threads} -c > {output.trf}
+        echo "SV length element class" > {output.repeats}
+        
+        awk 'NR>3 {{print $5,$7-$6,$10,$11}}' {input.out} >> {output.repeats}
 
-        #awk -v c=0 '{{if (/@/) {{S="N"; next}} }} {{ if (S=="N"&&$5>6&&$4>=5) {{++c; S="Y"}} }} END {{print c}}' *.fa.trf 
-        #grep -hP "\sLTR/" *out | /cluster/work/pausch/alex/software/RepeatMasker/util/buildSummary.pl - | awk '/^Sniffles2/&&$3>100 {{print $1}}' > ltr
-        #grep -hP "/RTE" *out | /cluster/work/pausch/alex/software/RepeatMasker/util/buildSummary.pl - | awk '/^Sniffles2/&&$3>100 {{print $1}}' > rte
-        #comm -12 <(sort ltr) <(sort rte) | wc -l
+        echo "SV period L score motif" > {output.VNTRs}
+
+        awk '{{if ($1~/@/) {{S=substr($1,2); next}} {{print S,$3,$4,$8,$14}} }}' {input.trf} >> {output.VNTRs}
         '''
 
 rule split_chromosomes:

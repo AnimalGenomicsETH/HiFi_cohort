@@ -16,8 +16,8 @@ rule bcftools_split:
 
 rule make_happy_regions:
     input:
-        TRF = '/cluster/work/pausch/alex/Pop_HiFi/GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed',
-        RM = '/cluster/work/pausch/alex/Pop_HiFi/GCF_002263795.3.repeatMasker.out.gz'
+        TRF = config['reference_TRF'],
+        RM = config['repeat_masking']
     output:
         regions = 'happy/regions.tsv',
         beds = expand('happy/{region}.bed',region=('VNTR','TE','normal'))

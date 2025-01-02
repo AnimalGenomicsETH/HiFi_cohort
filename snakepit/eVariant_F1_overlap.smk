@@ -1,5 +1,4 @@
 main_regions = range(1,30)
-samples = config['samples']
 
 rule get_bad_sites:
     input:

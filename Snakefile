@@ -13,6 +13,7 @@ include: 'snakepit/read_comparison.smk'
 include: 'snakepit/methylation.smk'
 include: 'snakepit/coverage.smk'
 include: 'snakepit/eVariant_F1_overlap.smk'
+include: 'snakepit/VEP.smk'
 
 #workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
 workflow._singularity_args =  '-B $TMPDIR -B /cluster/work/pausch/inputs'
@@ -24,8 +25,13 @@ wildcard_constraints:
 
 rule all:
     input:
+        ## alignments
         expand(rules.short_read_align.output,sample=samples,mapper=['bwa','strobe']),
-        expand(rules.samtools_merge.output,sample=samples,mapper=['mm2','pbmm2'])
-        #'variants/cohort.merged.vcf.gz',
-        #'happy/F1.csv',
-        #'methylation/merged.bed'
+        expand(rules.samtools_merge.output,sample=samples,mapper=['mm2','pbmm2']),
+        ## F1 comparison
+        'happy/mm2_bwa.Unrevised.F1.csv',
+        ## SV analysis
+        'mm2_SVs/SV_sequences.VNTRs.gz',
+        'VEP/genomic.INS.bed'
+        ## QTL
+
