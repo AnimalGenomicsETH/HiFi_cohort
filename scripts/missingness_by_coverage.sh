@@ -10,3 +10,8 @@ do
     bcftools query -r ${C} -i INFO/SVTYPE="\""${V}"\"" -f '[%GT,]\n' mm2_SVs/cohort.sniffles.denovo.vcf.gz | awk -v C=${C} -v V=${V} -F ',' '{++n;for (i=1;i<=120;++i) {a[i]+= $i=="./."?1:0}} END {printf C",denovo,"V","n","; for (i=1;i<=120;++i) {printf a[i]","}; printf "\n" }'
   done
 done
+
+
+
+
+{ echo -e "process\tchromosome\tposition\ttype\tlength\tmissingness" ; bcftools +fill-tags mm2_SVs/cohort.sniffles.denovo.vcf.gz -- -t F_MISSING | bcftools query -f 'denovo\t%CHROM\t%POS\t%INFO/SVTYPE\t%INFO/SVLEN\t%INFO/F_MISSING\n' ; bcftools +fill-tags mm2_SVs/cohort.sniffles.forced.vcf.gz -- -t F_MISSING | bcftools query -f 'forced\t%CHROM\t%POS\t%INFO/SVTYPE\t%INFO/SVLEN\t%INFO/F_MISSING\n' ; } > SV_missingness.csv

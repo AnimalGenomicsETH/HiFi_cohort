@@ -106,7 +106,11 @@ rule gather_alignment_stats:
 
 rule fastp_filter:
     input:
+<<<<<<< Updated upstream
         expand(config['short_reads']+'{{sample}}_R{N}.fastq.gz',N=(1,2))
+=======
+        expand('/cluster/work/pausch/inputs/fastq/BTA/{{sample}}_R{N}.fastq.gz',N=(1,2))
+>>>>>>> Stashed changes
     output:
         fastq = temp(expand('fastq/{sample}.R{N}.fastq.gz',N=(1,2),allow_missing=True))
     params:
@@ -143,7 +147,7 @@ rule short_read_align:
     resources:
         mem_mb = 3000,
         scratch = '50g',
-        walltime = '24h'
+        walltime = '4h'
     shell:
         '''
         {params.aligner_command} -t {threads} |\
