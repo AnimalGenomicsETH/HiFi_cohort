@@ -1,4 +1,3 @@
-
 rule all:
     input:
         expand('telomeres/{sample}.telo',sample=config['samples'])

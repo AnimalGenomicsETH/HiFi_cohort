@@ -1,5 +1,3 @@
-from pathlib import PurePath
-
 rule pb_CpG_tools:
     input:
         bam = multiext('/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/BTA/bams_UCD2.0_eQTL_HiFi_phased/{sample}.mm2.phased.cram','','.crai'),

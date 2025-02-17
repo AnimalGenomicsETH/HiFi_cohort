@@ -1,5 +1,3 @@
-from pathlib import PurePath
-
 rule bcftools_split:
     input:
         '{mapper}_DV/{chromosome}.{filtering}.vcf.gz'
@@ -37,7 +35,6 @@ rule make_happy_regions:
         bedtools complement -g {config[reference]}.fai -i /dev/stdin > {output.beds[2]}
 
         echo -e "VNTR\\t{output.beds[0]}\\nTE\\t{output.beds[1]}\\nnormal\\t{output.beds[2]}" > {output.regions}
-
         '''
 
 rule happy:

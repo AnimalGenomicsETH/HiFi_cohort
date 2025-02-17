@@ -1,5 +1,3 @@
-from pathlib import PurePath
-
 rule separate_small_and_structural_variants:
     input:
         vcf = '/cluster/work/pausch/HiFi_QTL/QTL/variants/117_samples/filtered_merged/filtered.{chromosome}.vcf.gz'

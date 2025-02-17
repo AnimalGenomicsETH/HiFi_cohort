@@ -1,4 +1,3 @@
-
 rule minimap2_align:
     input:
         uBAM = lambda wildcards: rules.fibertools_predict_m6a.output[0] if wildcards.methylation == 'm6a' else 'alignments/uBAM/{sample}/{cell}.5mC.bam',
@@ -106,11 +105,7 @@ rule gather_alignment_stats:
 
 rule fastp_filter:
     input:
-<<<<<<< Updated upstream
         expand(config['short_reads']+'{{sample}}_R{N}.fastq.gz',N=(1,2))
-=======
-        expand('/cluster/work/pausch/inputs/fastq/BTA/{{sample}}_R{N}.fastq.gz',N=(1,2))
->>>>>>> Stashed changes
     output:
         fastq = temp(expand('fastq/{sample}.R{N}.fastq.gz',N=(1,2),allow_missing=True))
     params:

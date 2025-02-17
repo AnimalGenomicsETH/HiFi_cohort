@@ -1,5 +1,3 @@
-from pathlib import PurePath
-
 wildcard_constraints:
     _pass = r'permutations|conditionals|nominals',
     tissue = r'Testis',

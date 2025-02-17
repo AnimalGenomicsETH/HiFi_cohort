@@ -15,12 +15,11 @@ include: 'snakepit/coverage.smk'
 include: 'snakepit/eVariant_F1_overlap.smk'
 include: 'snakepit/VEP.smk'
 
-#workflow._singularity_args = f'-B $TMPDIR -B {PurePath(config["reference"]).parent}'
 workflow._singularity_args =  '-B $TMPDIR -B /cluster/work/pausch/inputs'
 
 wildcard_constraints:
     sample = r'BSWCHEM\d+',
-    regions = r'|'.join(regions) + r'|Y_PAR|Y_HAPLOID',
+    regions = r'\d+|X|Y|Y_PAR|Y_HAPLOID|MT',
     mapper = r'bwa|strobe|mm2|pbmm2|wm2'
 
 rule all:
