@@ -1,9 +1,27 @@
 reference: 'ARS.fa'
 reference_uncompressed: 'ARS.fa'
 
-
 repeat_masking: 'GCF_002263795.3.repeatMasker.out.gz'
 reference_TRF: 'GCA_002263795.4_ARS-UCD2.0_genomic.trf.bed'
 repeat_library: ''
 short_reads: 'SR/'
 sample_sheet: 'test_samples.csv'
+
+
+variants:
+  filtered: 'variants.vcf.gz'
+
+mol_QTLs:
+  eQTL: 
+    Testis: 'eGenes.bed'
+  sQTL: 
+    Testis: 'sGenes.bed'
+covariates:
+  eQTL:
+    Testis:
+      PCA: 'covar.txt'
+  sQTL:
+    Testis:
+      PCA: 'covar.txt'
+
+FDR_script: 'qtltools_FDR.R'

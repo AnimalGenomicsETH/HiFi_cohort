@@ -1,20 +1,3 @@
-from pathlib import PurePath
-
-wildcard_constraints:
-    _pass = r'permutations|conditionals|nominals',
-    tissue = r'Testis',
-    variants = r'imputed|filtered',
-    chromosome = r'\d+|X|Y\w*',
-    MAF = r'\d+',
-    vcf = r'(eQTL|gwas)/\S+'
-
-regions = list(map(str,range(1,30))) + ['X','Y']
-
-rule all:
-    input:
-        expand('QTL/eQTL/Testis_{variants}_{covariates}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz',_pass=('nominals',),chromosome=regions,variants=config['variants'],MAF=config['MAF'],FDR=('None',),covariates=config['covariates']['eQTL']['Testis']),
-        expand('QTL/eQTL/Testis_{variants}_{covariates}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz',_pass=('conditionals',),chromosome=regions,variants=config['variants'],MAF=config['MAF'],FDR=config['FDR'],covariates=config['covariates']['eQTL']['Testis'])
-
 rule normalise_vcf:
     input:
         lambda wildcards: expand(config['variants'][wildcards.variants],**wildcards,allow_missing=True)
@@ -60,7 +43,7 @@ rule exclude_MAF:
 
 def get_pass(_pass,input):
     if _pass == 'permutations':
-        return f'--permute {config["permutations"]}'
+        return f'--permute {config.get("permutations",1000)}'
     elif _pass == 'conditionals':
         return f'--mapping {input.mapping}'
     elif _pass == 'nominals':
@@ -77,14 +60,15 @@ rule qtltools_parallel:
         merged = 'QTL/{QTL}/{tissue}_{variants}_{covariates}/{_pass}.{chromosome}.{MAF}.{FDR}.txt.gz'
     params:
         _pass = lambda wildcards,input: get_pass(wildcards._pass,input),
-        grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else ''
+        grp = lambda wildcards: '--grp-best' if wildcards.QTL == 'sQTL' else '',
+        window = config.get('window',1000000)
     threads: 1
     resources:
         mem_mb = 2500,
     shell:
         '''
 
-        QTLtools cis --vcf {input.vcf[0]} --exclude-sites {input.exclude} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {config[window]} --silent --log /dev/stderr --out /dev/stdout | pigz -p 2 -c > {output}
+        QTLtools cis --vcf {input.vcf[0]} --exclude-sites {input.exclude} --bed {input.bed} --cov {input.cov} --std-err {params._pass} {params.grp} --window {params.window} --silent --log /dev/stderr --out /dev/stdout | pigz -p 2 -c > {output}
         '''
 
 rule qtltools_FDR:
