@@ -1,4 +1,3 @@
-
 rule minimap2_align:
     input:
         uBAM = lambda wildcards: rules.fibertools_predict_m6a.output[0] if wildcards.methylation == 'm6a' else 'alignments/uBAM/{sample}/{cell}.5mC.bam',
@@ -143,7 +142,7 @@ rule short_read_align:
     resources:
         mem_mb = 3000,
         scratch = '50g',
-        walltime = '24h'
+        walltime = '4h'
     shell:
         '''
         {params.aligner_command} -t {threads} |\

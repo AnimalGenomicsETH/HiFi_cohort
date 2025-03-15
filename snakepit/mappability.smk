@@ -1,5 +1,3 @@
-from pathlib import PurePath
-
 rule genmap_index:
     input:
         reference = config['reference']

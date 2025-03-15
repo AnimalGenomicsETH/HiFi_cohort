@@ -1,5 +1,3 @@
-from pathlib import PurePath
-
 rule pb_CpG_tools:
     input:
         bam = multiext('/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/BTA/bams_UCD2.0_eQTL_HiFi_phased/{sample}.mm2.phased.cram','','.crai'),
@@ -266,3 +264,9 @@ rule print_GT_matrix:
         '''
         {{ echo -n "position REF ALT " ; bcftools query -l {input.vcf[0]} | tr '\\n' ' ' | sed 's/.$/\\n/' ; bcftools query -f '%POS %REF %ALT[ %GT]' {input.vcf[0]} ; }} | pigz -p 2 -c > {output}
         '''
+
+
+# other analysis
+#zgrep -wf non_expressed_genes.list ../../GCF_002263795.3_ARS-UCD2.0_genomic.gtf.gz | awk '$3=="gene"&&!($10 in A) {A[$10]=$1"\t"$4"\t"$5"\t"$7} END {for (k in A) {print A[k]"\t"k}}' | bedtools slop -b 2000 -g <(cut -f -2 ../../../../inputs/ref/BTA/U> non_expressed_genes.bed
+#for i in *.windows.individual.BAT.profile; do awk -F '\t' -v OFS='\t' 'NR>1&&($16+$17+$18)>10 {print $1,$2,$3,$14}' $i > LOW_TPM/${i%.windows.individual.BAT.profile}.bed; done
+#for i in *.bed; do echo "${i%.bed} $(bedtools intersect -a $i -b ../tissue_specific/very_expressed_genes.bed | awk '{n++;S+=$4} END {printf S/n" "}') $(bedtools intersect -v -a $i -b ../tissue_specific/non_expressed_genes.bed | awk '{n++;S+=$4} END {printf S/n" "}') $(bedtools intersect -a $i -b ../tissue_specific/non_expressed_genes.bed | awk '{n++;S+=$4} END {printf S/n}')"; done

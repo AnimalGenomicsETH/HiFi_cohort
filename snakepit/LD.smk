@@ -1,5 +1,3 @@
-from pathlib import PurePath
-
 rule separate_small_and_structural_variants:
     input:
         vcf = '/cluster/work/pausch/HiFi_QTL/QTL/variants/117_samples/filtered_merged/filtered.{chromosome}.vcf.gz'
@@ -35,7 +33,7 @@ rule plink_tagging:
 
 rule summarise_tags:
     input:
-        expand(rules.plink_tagging.output,chromosome=range(1,30),allow_missing=True)
+        expand(rules.plink_tagging.output,chromosome=list(map(str,range(1,30)))+['X_het_missing','Y_HAP_het_missing','Y_PAR'],allow_missing=True)
     output:
         'LD/SV.r2_{r2}.tags.csv'
     localrule: True

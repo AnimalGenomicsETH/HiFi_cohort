@@ -1,0 +1,60 @@
+digraph snakemake_dag {
+    graph[bgcolor=white, margin=0];
+    node[shape=box, style=rounded, fontname=sans,                 fontsize=10, penwidth=2];
+    edge[penwidth=2, color=grey];
+	0[label = "all", color = "0.05 0.6 0.85", style="rounded"];
+	1[label = "short_read_align", color = "0.58 0.6 0.85", style="rounded"];
+	2[label = "fastp_filter", color = "0.22 0.6 0.85", style="rounded"];
+	3[label = "samtools_merge", color = "0.56 0.6 0.85", style="rounded"];
+	4[label = "minimap2_align", color = "0.41 0.6 0.85", style="rounded"];
+	5[label = "pbmm2_align", color = "0.45 0.6 0.85", style="rounded"];
+	6[label = "gather_happy", color = "0.27 0.6 0.85", style="rounded"];
+	7[label = "happy", color = "0.32 0.6 0.85", style="rounded"];
+	8[label = "bcftools_split", color = "0.11 0.6 0.85", style="rounded"];
+	9[label = "deepvariant", color = "0.21 0.6 0.85", style="rounded"];
+	10[label = "make_happy_regions", color = "0.35 0.6 0.85", style="rounded"];
+	11[label = "bcftools_split_Y_PAR", color = "0.12 0.6 0.85", style="rounded"];
+	12[label = "merge_masked_chromosomes", color = "0.37 0.6 0.85", style="rounded"];
+	13[label = "repeat_masker", color = "0.53 0.6 0.85", style="rounded"];
+	14[label = "split_SV_sequences", color = "0.62 0.6 0.85", style="rounded"];
+	15[label = "bcftools_merge_sniffles", color = "0.10 0.6 0.85", style="rounded"];
+	16[label = "sniffles_genotype", color = "0.60 0.6 0.85", style="rounded"];
+	17[label = "sniffles_filter", color = "0.59 0.6 0.85", style="rounded"];
+	18[label = "sniffles_merge", color = "0.61 0.6 0.85", style="rounded"];
+	19[label = "sniffles_call", color = "0.59 0.6 0.85", style="rounded"];
+	20[label = "TRF", color = "0.03 0.6 0.85", style="rounded"];
+	21[label = "overlap_annotations", color = "0.42 0.6 0.85", style="rounded"];
+	22[label = "VEP", color = "0.04 0.6 0.85", style="rounded"];
+	23[label = "prepare_GTF", color = "0.50 0.6 0.85", style="rounded"];
+	6 -> 0
+	21 -> 0
+	12 -> 0
+	1 -> 0
+	3 -> 0
+	2 -> 1
+	5 -> 3
+	4 -> 3
+	7 -> 6
+	10 -> 7
+	8 -> 7
+	9 -> 8
+	11 -> 8
+	3 -> 9
+	1 -> 9
+	9 -> 11
+	20 -> 12
+	13 -> 12
+	14 -> 13
+	15 -> 14
+	16 -> 15
+	17 -> 16
+	3 -> 16
+	18 -> 17
+	19 -> 18
+	3 -> 19
+	14 -> 20
+	23 -> 21
+	22 -> 21
+	9 -> 22
+	23 -> 22
+}            
