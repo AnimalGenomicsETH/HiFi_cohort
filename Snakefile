@@ -14,7 +14,7 @@ wildcard_constraints:
     _pass = r'permutations|conditionals|nominals',
     tissue = r'Testis',
     variants = r'imputed|filtered',
-    chromosome = r'\d+|X|Y\w*',
+    chromosome = r'\d+|MT|X|Y\w*',
     MAF = r'\d+',
     vcf = r'(eQTL|gwas)/\S+'
 

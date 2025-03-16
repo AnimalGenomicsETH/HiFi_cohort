@@ -1,20 +1,33 @@
+from pathlib import PurePath
+import polars as pl
+
+information = pl.read_csv('methylation/cohort_information.tsv',separator='\t')
+
+rule all:
+    input:
+        ''
+
+#TODO: add phasing rules, output hap1/hap2
+#TODO: read from csv
+#TODO: compressed write
+#TODO: drop alignment model
 rule pb_CpG_tools:
     input:
         bam = multiext('/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/BTA/bams_UCD2.0_eQTL_HiFi_phased/{sample}.mm2.phased.cram','','.crai'),
         reference = config['reference']
     output:
-        bed = "methylation/{sample}.{mapper}.combined.bed",
+        bed = multiext("methylation/{sample}.{mapper}.combined.bed.gz","",".tbi"),
         BigWig = "methylation/{sample}.{mapper}.combined.bw"
     threads: 4
     resources:
-        mem_mb = 5000,
-        walltime = '4h'
+        mem_mb_per_cpu = 5000,
+        runtime = '4h'
     params:
         prefix = lambda wildcards, output: PurePath(output['bed']).with_suffix('').with_suffix(''),
-        model = '/cluster/work/pausch/alex/software/pb-CpG-tools-v2.3.2-x86_64-unknown-linux-gnu/models/pileup_calling_model.v1.tflite'
     shell:
         '''
-        aligned_bam_to_cpg_scores --bam {input.bam[0]} --ref {input.reference} --model {params.model} --output-prefix {params.prefix} --threads {threads}
+aligned_bam_to_cpg_scores --bam {input.bam[0]} --ref {input.reference} \
+--output-prefix {params.prefix} --threads {threads}
         '''
 
 rule prepare_CpG_islands:
@@ -53,17 +66,15 @@ rule methbat_profile:
         prefix = lambda wildcards, input: PurePath(input['bed'][0]).with_suffix('').with_suffix('')
     threads: 1
     resources:
-        mem_mb = 5000,
-        walltime = '1h'
+        mem_mb_per_cpu = 5000,
+        runtime = '1h'
     shell:
         '''
-        methbat profile --input-prefix {params.prefix} --input-regions {input.regions} --output-region-profile {output.BAT[0]} --output-asm-bed {output.BAT[1]}
+methbat profile --input-prefix {params.prefix} --input-regions {input.regions} \
+--output-region-profile {output.BAT[0]} --output-asm-bed {output.BAT[1]}
         '''
 
 def get_samples(subset):
-    import polars as pl
-    information = pl.read_csv('methylation/cohort_information.tsv',separator='\t')
-
     match subset:
         case 'cohort':
             return information.get_column('identifier').to_list()
@@ -84,11 +95,11 @@ rule methbat_build:
     params:
         collection = lambda wildcards, input: build_information_collection(get_samples(wildcards.cohort),input.collection,input.metadata)
     resources:
-        mem_mb = lambda wildcards: 5000 if wildcards.mode == 'islands' else 5000,
-        walltime = lambda wildcards: '30m' if wildcards.mode == 'islands' else '2h'
+        mem_mb_per_cpu = lambda wildcards: 5000 if wildcards.mode == 'islands' else 5000,
+        runtime = lambda wildcards: '30m' if wildcards.mode == 'islands' else '2h'
     shell:
         '''
-        methbat build --input-collection <(echo -e "{params.collection}") --output-profile {output.profile}
+methbat build --input-collection <(echo -e "{params.collection}") --output-profile {output.profile}
         '''
 
 rule methbat_compare:
@@ -98,13 +109,13 @@ rule methbat_compare:
         'methylation/{cohort}.{mode}.compare'
     threads: 1
     resources:
-        mem_mb = 5000,
-        walltime = '30m'
+        mem_mb_per_cpu = 5000,
+        runtime = '30m'
     shell:
         '''
-        methbat compare --input-profile {input} --output-comparison {output} \
-        --compare-category EPIDIDYMIS --baseline-category TESTIS \
-        --min-zscore 3 --min-delta 0.2 --min-samples 10
+methbat compare --input-profile {input} --output-comparison {output} \
+--compare-category EPIDIDYMIS --baseline-category TESTIS \
+--min-zscore 3 --min-delta 0.2 --min-samples 10
         '''
 
 rule compare_compares:
@@ -155,8 +166,8 @@ rule get_gene_start_coordinates:
         bed = 'methylation/tissue_specific/{reason}.TSS.bed'
     threads: 1
     resources:
-        mem_mb = 5000,
-        walltime = '4h'
+        mem_mb_per_cpu = 5000,
+        runtime = '4h'
     shell:
         '''
         #alternative awk '$3=="start_codon"&&!($10 in A) {{A[$10]=$1"\\t"$4"\\t"$5"\\t"$7}} END {{for (k in A) {{print A[k]"\\t"k"\\t{wildcards.reason}"}} }}'
@@ -217,8 +228,8 @@ rule convert_bed_to_csv:
         'methylation/sites/{sample}.{chromosome}.csv.gz'
     threads: 1
     resources:
-        mem_mb = 1500,
-        walltime = '30m'
+        mem_mb_per_cpu = 1500,
+        runtime = '30m'
     shell:
         '''
         {{ echo "position {wildcards.sample}" ; awk '$1=={wildcards.chromosome} {{ print $2,$4 }}' {input} ; }} | pigz -p 2 -c > {output}
@@ -258,15 +269,9 @@ rule print_GT_matrix:
         'methylation/sites/{chromosome}.GTs.csv.gz'
     threads: 1
     resources:
-        mem_mb = 2500,
-        walltime = '1h'
+        mem_mb_per_cpu = 2500,
+        runtime = '1h'
     shell:
         '''
         {{ echo -n "position REF ALT " ; bcftools query -l {input.vcf[0]} | tr '\\n' ' ' | sed 's/.$/\\n/' ; bcftools query -f '%POS %REF %ALT[ %GT]' {input.vcf[0]} ; }} | pigz -p 2 -c > {output}
         '''
-
-
-# other analysis
-#zgrep -wf non_expressed_genes.list ../../GCF_002263795.3_ARS-UCD2.0_genomic.gtf.gz | awk '$3=="gene"&&!($10 in A) {A[$10]=$1"\t"$4"\t"$5"\t"$7} END {for (k in A) {print A[k]"\t"k}}' | bedtools slop -b 2000 -g <(cut -f -2 ../../../../inputs/ref/BTA/U> non_expressed_genes.bed
-#for i in *.windows.individual.BAT.profile; do awk -F '\t' -v OFS='\t' 'NR>1&&($16+$17+$18)>10 {print $1,$2,$3,$14}' $i > LOW_TPM/${i%.windows.individual.BAT.profile}.bed; done
-#for i in *.bed; do echo "${i%.bed} $(bedtools intersect -a $i -b ../tissue_specific/very_expressed_genes.bed | awk '{n++;S+=$4} END {printf S/n" "}') $(bedtools intersect -v -a $i -b ../tissue_specific/non_expressed_genes.bed | awk '{n++;S+=$4} END {printf S/n" "}') $(bedtools intersect -a $i -b ../tissue_specific/non_expressed_genes.bed | awk '{n++;S+=$4} END {printf S/n}')"; done
