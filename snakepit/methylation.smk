@@ -1,4 +1,3 @@
-from pathlib import PurePath
 import polars as pl
 
 information = pl.read_csv('methylation/cohort_information.tsv',separator='\t')
@@ -9,8 +8,6 @@ rule all:
 
 #TODO: add phasing rules, output hap1/hap2
 #TODO: read from csv
-#TODO: compressed write
-#TODO: drop alignment model
 rule pb_CpG_tools:
     input:
         bam = multiext('/nfs/nas12.ethz.ch/fs1201/green_groups_tg_public/data/BTA/bams_UCD2.0_eQTL_HiFi_phased/{sample}.mm2.phased.cram','','.crai'),
@@ -23,11 +20,15 @@ rule pb_CpG_tools:
         mem_mb_per_cpu = 5000,
         runtime = '4h'
     params:
-        prefix = lambda wildcards, output: PurePath(output['bed']).with_suffix('').with_suffix(''),
+        prefix = lambda wildcards, output: Path(output['bed']).with_suffix('').with_suffix(''),
     shell:
         '''
-aligned_bam_to_cpg_scores --bam {input.bam[0]} --ref {input.reference} \
---output-prefix {params.prefix} --threads {threads}
+aligned_bam_to_cpg_scores \
+--bam {input.bam[0]} \
+--ref {input.reference} \
+--output-prefix {params.prefix} \
+--min-coverage 4 \
+--threads {threads}
         '''
 
 rule prepare_CpG_islands:
@@ -63,15 +64,18 @@ rule methbat_profile:
     output:
         BAT = multiext('methylation/{sample}.{mode}.{_group}.BAT','.profile','.ASM')
     params:
-        prefix = lambda wildcards, input: PurePath(input['bed'][0]).with_suffix('').with_suffix('')
+        prefix = lambda wildcards, input: Path(input['bed'][0]).with_suffix('').with_suffix('')
     threads: 1
     resources:
         mem_mb_per_cpu = 5000,
         runtime = '1h'
     shell:
         '''
-methbat profile --input-prefix {params.prefix} --input-regions {input.regions} \
---output-region-profile {output.BAT[0]} --output-asm-bed {output.BAT[1]}
+methbat profile \
+--input-prefix {params.prefix} \
+--input-regions {input.regions} \
+--output-region-profile {output.BAT[0]} \
+--output-asm-bed {output.BAT[1]}
         '''
 
 def get_samples(subset):
@@ -99,12 +103,15 @@ rule methbat_build:
         runtime = lambda wildcards: '30m' if wildcards.mode == 'islands' else '2h'
     shell:
         '''
-methbat build --input-collection <(echo -e "{params.collection}") --output-profile {output.profile}
+methbat build \
+--input-collection <(echo -e "{params.collection}") \
+--output-profile {output.profile}
         '''
 
+#TODO: generalise
 rule methbat_compare:
     input:
-        rules.methbat_build.output['profile']
+        profile = rules.methbat_build.output['profile']
     output:
         'methylation/{cohort}.{mode}.compare'
     threads: 1
@@ -113,9 +120,14 @@ rule methbat_compare:
         runtime = '30m'
     shell:
         '''
-methbat compare --input-profile {input} --output-comparison {output} \
---compare-category EPIDIDYMIS --baseline-category TESTIS \
---min-zscore 3 --min-delta 0.2 --min-samples 10
+methbat compare \
+--input-profile {input.profile} \
+--output-comparison {output} \
+--compare-category EPIDIDYMIS \
+--baseline-category TESTIS \
+--min-zscore 3 \
+--min-delta 0.2 \
+--min-samples 10
         '''
 
 rule compare_compares:
