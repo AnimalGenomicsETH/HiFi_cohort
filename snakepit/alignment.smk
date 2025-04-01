@@ -42,7 +42,7 @@ rule pbmm2_align:
     output:
         temp(multiext('alignments/pbmm2/{sample}/{cell}.{methylation}.bam','','.bai'))
     params:
-        index = lambda wildcards, output: PurePath(output[1]).suffix.upper()[1:]
+        index = lambda wildcards, output: Path(output[1]).suffix.upper()[1:]
     threads: lambda wildcards, input: 24 if input.size_mb > 20e3 else 12
     resources:
         mem_mb = 4000,

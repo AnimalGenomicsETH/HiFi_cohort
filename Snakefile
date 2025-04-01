@@ -1,5 +1,4 @@
 import pandas as pd
-from pathlib import PurePath
 
 HiFi_dataframe = pd.read_csv(config['sample_sheet'])
 samples = sorted(list(HiFi_dataframe['Sample'].unique()))

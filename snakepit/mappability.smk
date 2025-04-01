@@ -18,7 +18,7 @@ rule genmap_map:
     output:
         _dir = 'mappability/{kmer}_{error}.bedgraph'
     params:
-        basename = lambda wildcards, output: PurePath(output[0]).with_suffix('')
+        basename = lambda wildcards, output: Path(output[0]).with_suffix('')
     threads: 1
     resources:
         mem_mb = 25000,

@@ -4,7 +4,7 @@ rule bcftools_split:
     output:
         expand('{mapper}_DV/PER_SAMPLE_{chromosome}_{filtering}/{sample}.vcf.gz',sample=samples,allow_missing=True)
     params:
-        _dir = lambda wildcards, output: PurePath(output[0]).parent
+        _dir = lambda wildcards, output: Path(output[0]).parent
     resources:
         mem_mb = 2500
     shell:
@@ -47,7 +47,7 @@ rule happy:
         csv = 'happy/{sample}.{chromosome}.{filtering}.{read1}_{read2}.summary.csv',
         others = multiext('happy/{sample}.{chromosome}.{filtering}.{read1}_{read2}','.bcf','.bcf.csi','.extended.csv','.roc.all.csv.gz','.runinfo.json')
     params:
-        _dir = lambda wildcards, output: PurePath(output.csv).with_suffix('').with_suffix('')
+        _dir = lambda wildcards, output: Path(output.csv).with_suffix('').with_suffix('')
     container: '/cluster/work/pausch/alex/software/images/hap.py_latest.sif'
     threads: 2
     resources:
@@ -93,7 +93,7 @@ rule SV_comparison:
         genome_file={config[reference]} --pre_normalize --ignore_strand --ignore_type \
         max_dist_linear=0.5 max_dist=250 |\
         tee {output.vcf} |\
-        grep -hoP "SUPP_VEC=\K\d+" |\
+        grep -hoP "SUPP_VEC=\\K\\d+" |\
         awk ' {{ A[$1]+=1 }} END {{ print A["01"],A["10"],A["11"] }}' > {output.isec}
         '''
 

@@ -25,7 +25,7 @@ rule plink_tagging:
         walltime = '1h'
     params:
         mem = lambda wildcards, threads, resources: threads*resources.mem_mb,
-        out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
+        out = lambda wildcards, output: Path(output[0]).with_suffix('').with_suffix('')
     shell:
         '''
         plink --vcf {input.vcf} --show-tags <(bcftools query -i 'ID~"Sniffles"' -f '%ID' {input.vcf}) --tag-r2 0.{wildcards.r2} --tag-kb 1000 --threads {threads} --memory {params.mem} --chr-set 30 --vcf-half-call h --list-all --out {params.out}

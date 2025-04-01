@@ -14,10 +14,10 @@ rule deepvariant:
     output:
         expand('{mapper}_DV/{region}.Unrevised.vcf.gz',region=regions,allow_missing=True)
     params:
-        name = lambda wildcards, output: PurePath(output[0]).parent,
+        name = lambda wildcards, output: Path(output[0]).parent,
         model = lambda wildcards: 'WGS' if wildcards.mapper in ['bwa','strobe'] else 'PACBIO',
-        bam = lambda wildcards, input: PurePath(input[0]).suffix,
-        index = lambda wildcards, input: PurePath(input[len(samples)]).suffix,
+        bam = lambda wildcards, input: Path(input[0]).suffix,
+        index = lambda wildcards, input: Path(input[len(samples)]).suffix,
         config = 'config/deepvariant.yaml'
     localrule: True
     shell:
@@ -59,8 +59,8 @@ rule beagle4_impute:
     output:
         multiext('{mapper}_DV/{region}.beagle4.vcf.gz','','.tbi')
     params:
-        prefix = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix(''),
-        name = lambda wildcards, output: PurePath(output[0]).name
+        prefix = lambda wildcards, output: Path(output[0]).with_suffix('').with_suffix(''),
+        name = lambda wildcards, output: Path(output[0]).name
     threads: 10
     resources:
         mem_mb = 5000,
@@ -213,7 +213,7 @@ rule bcftools_filter:
         multiext('{mapper}_SVs/filtered/{region}.vcf.gz','','.csi')
     params:
         regions = ','.join(regions[:-1]),
-        _dir = lambda wildcards, output: PurePath(output[0]).parent#ith_suffix('').with_suffix('').with_suffix('').with_suffix('')
+        _dir = lambda wildcards, output: Path(output[0]).parent#ith_suffix('').with_suffix('').with_suffix('').with_suffix('')
     threads: 2
     resources:
         mem_mb = 2500
@@ -238,7 +238,7 @@ rule merge_QTL_variants:
         '''
         bcftools norm --threads {threads} -f {config[reference]} -m -any -Ou {input.small[0]} |\
         bcftools sort -T $TMPDIR -Ou - |\
-        bcftools annotate --threads {threads} --set-id '%CHROM\_%POS\_%TYPE\_%REF\_%ALT' -o $TMPDIR/small.vcf.gz
+        bcftools annotate --threads {threads} --set-id '%CHROM\\_%POS\\_%TYPE\\_%REF\\_%ALT' -o $TMPDIR/small.vcf.gz
         tabix -p vcf $TMPDIR/small.vcf.gz
 
         bcftools concat --allow-overlaps --threads {threads} -Ou {input.SV[0]} $TMPDIR/small.vcf.gz |\

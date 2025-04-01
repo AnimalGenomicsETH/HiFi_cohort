@@ -11,7 +11,7 @@ rule normalise_vcf:
         '''
         bcftools norm --threads {threads} -f {config[reference]} -d exact -m -any {input} -Ou |\
         bcftools sort -T $TMPDIR -Ou - |\
-        bcftools annotate --threads {threads} --set-id '%CHROM\_%POS\_%TYPE\_%REF\_%ALT' -o {output[0]} -
+        bcftools annotate --threads {threads} --set-id '%CHROM\\_%POS\\_%TYPE\\_%REF\\_%ALT' -o {output[0]} -
         tabix -fp vcf {output[0]}
         '''
 
@@ -38,7 +38,7 @@ rule exclude_MAF:
     shell:
         '''
         bcftools view --threads 2 -Q 0.{wildcards.MAF}:minor -Ou {input[0]} |\
-        bcftools query -f '%ID\n'  - > {output}
+        bcftools query -f '%ID\\n'  - > {output}
         '''
 
 def get_pass(_pass,input):
@@ -77,7 +77,7 @@ rule qtltools_FDR:
     output:
         'QTL/{QTL}/{tissue}_{variants}_{covariates}/permutations_all.{chromosome}.{MAF}.{FDR}.thresholds.txt'
     params:
-        out = lambda wildcards, output: PurePath(output[0]).with_suffix('').with_suffix('')
+        out = lambda wildcards, output: Path(output[0]).with_suffix('').with_suffix('')
     #conda: 'R'
     envmodules:
         'gcc/8.2.0',
