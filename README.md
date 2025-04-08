@@ -12,13 +12,15 @@ Here, we extend the cohort with HiFi sequencing, to more thoroughly explore the 
 
 Snakemake pipelines covering the major steps of HiFi alignment, small and structural variant calling, and association mapping are included here.
 Some input (e.g., RNA alignments) are already assumed to be present.
-These steps are detailed below.
+The three major steps are detailed below
+
+ - SV analysis
+ - small variant comparison
+ - association mapping
 
 ![rulegraph](rulegraph.svg]
 
-
 n.b. These pipelines are designed to run on the Euler cluster, and may implicitly assume the majority of tools/environments are on path.
-
 
 ## Citation
 
