@@ -9,6 +9,8 @@ Constructing a high quality and nearly homogeneous cohort of primarily Braunvieh
 Here, we extend the cohort with HiFi sequencing, to more thoroughly explore the role of structural variants on molecular QTL.
 
 ## Usage
+[![snakemaker](https://github.com/AnimalGenomicsETH/HiFi_cohort/actions/workflows/snakemake.yaml/badge.svg)](https://github.com/AnimalGenomicsETH/HiFi_cohort/actions/workflows/snakemake.yaml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Snakemake pipelines covering the major steps of HiFi alignment, small and structural variant calling, and association mapping are included here.
 Some input (e.g., RNA alignments) are already assumed to be present.
