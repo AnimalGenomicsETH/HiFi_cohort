@@ -18,7 +18,7 @@ The three major steps are detailed below
  - small variant comparison
  - association mapping
 
-![rulegraph](rulegraph.svg]
+![rulegraph](rulegraph.svg)
 
 n.b. These pipelines are designed to run on the Euler cluster, and may implicitly assume the majority of tools/environments are on path.
 
