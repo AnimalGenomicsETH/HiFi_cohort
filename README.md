@@ -20,10 +20,11 @@ The three major steps are detailed below
  - small variant comparison
  - association mapping
 
-![rulegraph](rulegraph.svg)
+![rulegraph](.test/rulegraph.svg)
 
-n.b. These pipelines are designed to run on the Euler cluster, and may implicitly assume the majority of tools/environments are on path.
+n.b. These pipelines are designed to run on the ETH Euler cluster, and may implicitly assume the majority of tools/environments are on path.
 
 ## Citation
 
-> *Structural variants are enriched for molecular QTL in a cattle long read cohort*. Mapel, X.M., Leonard, A.S., Pausch, H. (**2025**).
+> *Structural variants are enriched for molecular QTL in a cattle long read cohort*. Mapel, X.M., Leonard, A.S., Pausch, H. *bioRxiv*. (**2025**). [https://doi.org/10.1101/2025.05.16.654493](https://www.biorxiv.org/content/10.1101/2025.05.16.654493v1).
+
