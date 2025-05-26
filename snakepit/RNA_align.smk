@@ -107,14 +107,14 @@ rule star:
 		cd $TMPDIR
 		module load jdk 
 		       
-		/cluster/work/pausch/xena/programs/STAR/source/STAR --runThreadN 15 --twopassMode Basic --genomeDir {input.gDir} --sjdbGTFfile {input.sjdb} --sjdbOverhang 100 --readFilesIn {input.R1} {input.R2} --readFilesCommand zcat --outSAMmapqUnique 60 --waspOutputMode SAMtag --varVCFfile <(zcat {input.het_vcf} ) --outSAMtype BAM SortedByCoordinate --outMultimapperOrder Random
+		/path/to/STAR/source/STAR --runThreadN 15 --twopassMode Basic --genomeDir {input.gDir} --sjdbGTFfile {input.sjdb} --sjdbOverhang 100 --readFilesIn {input.R1} {input.R2} --readFilesCommand zcat --outSAMmapqUnique 60 --waspOutputMode SAMtag --varVCFfile <(zcat {input.het_vcf} ) --outSAMtype BAM SortedByCoordinate --outMultimapperOrder Random
 				
 		##coordinate sorting and add read groups
 		java -jar /cluster/apps/gcc-4.8.5/picard-2.25.7-krxq7vc5hgwrxwunjcwuefbjuzuvwawq/bin/picard.jar \
 		AddOrReplaceReadGroups I=Aligned.sortedByCoord.out.bam  O=Aligned_new_sorted.bam {params.rg} 
 
 		## index 
-		/cluster/work/pausch/alex/software/samtools/samtools index Aligned_new_sorted.bam
+		/path/to/samtools/samtools index Aligned_new_sorted.bam
 
 		## copy files
 		cp $TMPDIR/Aligned_new_sorted.bam {output.bam}
